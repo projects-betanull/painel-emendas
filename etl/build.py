@@ -125,6 +125,8 @@ def main(argv=None) -> dict:
     municipios = json.loads((args.raw / "municipios.json").read_text(encoding="utf-8"))
     indice = IndiceMunicipios(municipios)
     bruto = ler_csv_portal(args.raw / "emendas.csv")
+    anos_brutos = sorted(pd.to_numeric(bruto.get("Ano da Emenda", pd.Series(dtype=str)), errors="coerce").dropna().astype(int).unique().tolist())
+    print(f"anos no arquivo do Portal: {anos_brutos}")
     fato = normalizar_emendas(bruto, indice, args.ano_inicial)
 
     arq_fav = args.raw / "EmendasParlamentares_PorFavorecido.csv"

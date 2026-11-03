@@ -17,6 +17,8 @@ jobs:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       # Vazio enquanto o segredo não for criado; a publicação do site é pulada.
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Primeiro ano carregado; o ETL usa tudo o que o Portal tiver a partir daqui.
+      ANO_INICIAL: "2000"
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4

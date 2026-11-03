@@ -47,7 +47,7 @@ def caminho_municipio(nome: str, uf: str) -> str:
 # --------------------------------------------------------------------------- layout
 
 
-def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str) -> str:
+def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2020") -> str:
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -65,7 +65,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str) 
 </main>
 <footer>
 <p>Fonte: <a href="https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares">Portal da Transparência (CGU)</a>,
-valores recebidos pelos favorecidos desde 2020. Dados atualizados em {e(atualizado)}.</p>
+valores recebidos pelos favorecidos desde {e(desde)}. Dados atualizados em {e(atualizado)}.</p>
 <p>Projeto independente, sem login e sem anúncios. <a href="{raiz}apoie/">Apoie com Lightning ⚡</a></p>
 </footer>
 </body>
@@ -109,6 +109,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
             shutil.copytree(arq, destino / arq.name)
 
     atualizado = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y")
+    desde = str(int(fav["ano"].min()))
     nomes = {str(m["codigo_ibge"]): (m["nome"], m["uf"]) for m in municipios}
     df = fav[fav["municipio_ibge"].notna()].copy()
     df["municipio_ibge"] = df["municipio_ibge"].astype(str)
@@ -139,7 +140,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
         corpo = f"""
 <p class="migalha"><a href="../../">Início</a> › {e(uf)} › {e(nome)}</p>
 <h1>{e(nome)} <span class="uf">{e(uf)}</span></h1>
-<p class="destaque"><strong>{brl(total)}</strong> recebidos em emendas parlamentares desde 2020 ·
+<p class="destaque"><strong>{brl(total)}</strong> recebidos em emendas parlamentares desde {desde} ·
 {int(rank_uf[codigo])}º de {int(qtd_uf[uf])} municípios de {e(uf)} com emendas</p>
 <section><h2>Por ano</h2>{barras_ano(por_ano.loc[codigo])}</section>
 <section><h2>Quem mandou o dinheiro</h2>
@@ -154,10 +155,11 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
         (pasta / "index.html").write_text(
             pagina(
                 f"Emendas parlamentares em {nome} ({uf})",
-                f"{nome} ({uf}) recebeu {brl(total)} em emendas parlamentares desde 2020. Veja por ano, autor e favorecido.",
+                f"{nome} ({uf}) recebeu {brl(total)} em emendas parlamentares desde {desde}. Veja por ano, autor e favorecido.",
                 corpo,
                 "../../",
                 atualizado,
+                desde,
             ),
             encoding="utf-8",
         )
@@ -180,7 +182,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
     corpo = f"""
 <section class="hero">
 <h1>Quanto o seu município recebeu em emendas parlamentares?</h1>
-<p>{brl_curto(total_geral)} pagos a {len(totais):,} municípios desde 2020. Busque o seu:</p>
+<p>{brl_curto(total_geral)} pagos a {len(totais):,} municípios desde {desde}. Busque o seu:</p>
 <input id="q" type="search" placeholder="Digite o nome do município" autocomplete="off" aria-label="Buscar município">
 <ul id="res" class="resultados"></ul>
 </section>
@@ -195,6 +197,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
             corpo,
             "",
             atualizado,
+            desde,
         ),
         encoding="utf-8",
     )
