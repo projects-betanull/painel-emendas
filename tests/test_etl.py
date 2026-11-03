@@ -146,3 +146,23 @@ def test_site(tmp_path):
     busca = json.loads((site / "busca.json").read_text(encoding="utf-8"))
     assert {m["n"] for m in busca} == {"Campinas", "Fortaleza"}
     assert (site / "estilo.css").exists() and (site / "apoie" / "index.html").exists()
+
+
+def test_explorador(tmp_path):
+    import subprocess
+
+    site = tmp_path / "site"
+    build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site)])
+    cubo = json.loads((site / "explorar" / "cubo.json").read_text(encoding="utf-8"))
+    assert sum(cubo["valor"]) == 4_250_000  # 4 pagamentos desde 2020, inclusive sem município
+    js = Path(__file__).parent.parent / "etl" / "site_static" / "explorar" / "explorar.js"
+    script = f"""
+const m = require({json.dumps(str(js))}); const c = require({json.dumps(str(site / 'explorar' / 'cubo.json'))});
+let e = m.deHash('l=uf&m=valor'); let r = m.pivotar(c, e);
+const top = c.dims.uf[r.linhas[0][0]];
+e = m.descer(e, 'CE'); const r2 = m.pivotar(c, e);
+const ok = top === 'CE' && e.lin === 'municipio' && r2.linhas.length === 1 && m.subir(e, 'uf').lin === 'uf' && m.deHash(m.paraHash(e)).f.uf[0] === 'CE';
+console.log(JSON.stringify({{top, lin: e.lin, total: r.total, ok}}));
+"""
+    out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout
+    assert json.loads(out)["ok"], out

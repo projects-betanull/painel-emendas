@@ -148,6 +148,9 @@ def main(argv=None) -> dict:
 
         paginas = gerar_site(fav, municipios, args.site)
         print(f"site: {paginas:,} páginas de município -> {args.site}")
+        from .cubo import gravar_cubo, montar_cubo
+
+        gravar_cubo(montar_cubo(fav, fato, municipios), args.site / "explorar")
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
