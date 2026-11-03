@@ -119,7 +119,10 @@ def main(argv=None) -> dict:
     if not args.sem_baixar:
         from .download import baixar_emendas, baixar_municipios
 
+        from .download import baixar_populacao
+
         baixar_municipios(args.raw)
+        baixar_populacao(args.raw)
         baixar_emendas(args.raw)
 
     municipios = json.loads((args.raw / "municipios.json").read_text(encoding="utf-8"))
@@ -146,7 +149,9 @@ def main(argv=None) -> dict:
         qualidade["favorecidos"] = relatorio_favorecidos(fav)
         from .site import gerar_site
 
-        paginas = gerar_site(fav, municipios, args.site)
+        arq_pop = args.raw / "populacao.json"
+        populacao = json.loads(arq_pop.read_text(encoding="utf-8")) if arq_pop.exists() else None
+        paginas = gerar_site(fav, municipios, args.site, fato=fato, populacao=populacao)
         print(f"site: {paginas:,} páginas de município -> {args.site}")
         from .cubo import gravar_cubo, gravar_cubos_por_uf, montar_cubo
 

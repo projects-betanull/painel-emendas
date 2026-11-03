@@ -9,13 +9,21 @@
 </head>
 <body>
 <header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
-<span class="sub">explorador: filtre, cruze e aprofunde</span></header>
+<span class="sub">explorador: filtre, cruze e aprofunde</span>
+<nav class="menu"><a href="../painel/">Painel</a><a href="../explorar/">Explorar</a><a href="../sobre/">Fontes</a></nav></header>
 <main class="largo">
 <h1>Explorar <a class="troca" id="irPainel" href="../painel/">Ver no painel ›</a></h1>
+<p class="dica topo-dica">Toque num nome da tabela para aprofundar. Toque num filtro para voltar. O link da página guarda a consulta.</p>
+<div class="perguntas" aria-label="Perguntas prontas">
+  <a href="#l=autor&amp;c=ano">Quem mais enviou?</a>
+  <a href="#l=uf&amp;c=area">Para quais áreas, por estado?</a>
+  <a href="#l=municipio&amp;f.tipo=Emenda%20Individual%20-%20Transfer%C3%AAncias%20Especiais">Emendas Pix por município</a>
+  <a href="#l=tipo&amp;c=ano">Tipos de emenda ao longo dos anos</a>
+</div>
 <div class="controles">
-  <label>Linhas <select id="linhas"></select></label>
-  <label>Colunas <select id="colunas"></select></label>
-  <label>Medida <select id="medida"><option value="valor">Valor recebido</option><option value="n">Nº de pagamentos</option></select></label>
+  <label>Agrupar por <select id="linhas"></select></label>
+  <label>Comparar por <select id="colunas"></select></label>
+  <label>Mostrar <select id="medida"><option value="valor">Valor recebido</option><option value="n">Nº de pagamentos</option></select></label>
 </div>
 <nav id="trilha" class="trilha" aria-label="Filtros aplicados"></nav>
 <section id="bancada" class="cartao bancada" hidden></section>
@@ -24,7 +32,7 @@
 <div class="tabela"><table id="pivo"></table></div>
 <p id="mais" class="dica"></p>
 </main>
-<footer><p>Clique numa linha para aprofundar (drill-down). Clique num filtro acima da tabela para voltar (drill-up). O link da página guarda a sua consulta.</p></footer>
+<footer><p>Fonte oficial: <a href="https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares">Portal da Transparência (CGU)</a>. Valores como publicados. <a href="../sobre/">Fontes, método e limites</a>. Site independente e não oficial.</p></footer>
 <script src="../motor.js"></script>
 <script src="explorar.js"></script>
 </body>

@@ -10,9 +10,10 @@
 <body>
 <header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
 <span class="sub">painel interativo</span>
-<a class="nav" id="irExplorar" href="../explorar/">Explorar ›</a></header>
+<nav class="menu"><a href="../painel/">Painel</a><a id="irExplorar" href="../explorar/">Explorar</a><a href="../sobre/">Fontes</a></nav></header>
 <main class="largo">
 <h1>Painel</h1>
+<p class="dica topo-dica">Toque numa barra para filtrar todo o painel. Toque num filtro para removê-lo.</p>
 <nav id="trilha" class="trilha" aria-label="Filtros aplicados"></nav>
 <section id="bancada" class="cartao bancada" hidden></section>
 <div id="kpis" class="kpis"><p>Carregando dados…</p></div>
@@ -27,7 +28,7 @@
   <section class="cartao"><div class="cab"><h2>Natureza do favorecido</h2><a data-dim="natureza">Explorar ›</a></div><div id="g-natureza"></div></section>
 </div>
 </main>
-<footer><p>Toque numa barra para filtrar todo o painel. Toque num filtro acima para removê-lo. "Explorar ›" abre a tabela com os mesmos filtros.</p></footer>
+<footer><p>Fonte oficial: <a href="https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares">Portal da Transparência (CGU)</a>. Valores como publicados. <a href="../sobre/">Fontes, método e limites</a>. Site independente e não oficial.</p></footer>
 <script src="../motor.js"></script>
 <script src="painel.js"></script>
 </body>

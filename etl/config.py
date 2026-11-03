@@ -30,3 +30,7 @@ CSV_SEP = ";"
 
 # Endereço Lightning (coinos) para contribuições, mostrado na página Apoie.
 LIGHTNING_ADDRESS = os.environ.get("LIGHTNING_ADDRESS", "lizard43@coinos.io")
+
+# Endereço público do site (links de compartilhamento) e do repositório (correções).
+SITE_URL = os.environ.get("SITE_URL", "https://painel-emendas.pages.dev")
+REPO_URL = "https://github.com/projects-betanull/painel-emendas"

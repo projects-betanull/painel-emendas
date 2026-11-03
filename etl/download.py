@@ -107,6 +107,33 @@ def _municipios_espelho() -> list[dict]:
     ]
 
 
+# População por município (IBGE/SIDRA): estimativa mais recente; se falhar, Censo 2022.
+SIDRA_POPULACAO = [
+    ("estimativa", "https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/9324/p/last"),
+    ("Censo 2022", "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"),
+]
+
+
+def baixar_populacao(destino: Path = config.RAW_DIR) -> Path | None:
+    """Grava populacao.json {codigo_ibge: habitantes}. Sem acesso ao IBGE, segue sem ela."""
+    for nome, url in SIDRA_POPULACAO:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=60)
+            r.raise_for_status()
+            linhas = r.json()[1:]  # a primeira linha é o cabeçalho
+            pop = {str(l["D1C"]): int(l["V"]) for l in linhas if str(l.get("V", "")).isdigit()}
+            if len(pop) < 5500:
+                raise ValueError(f"só {len(pop)} municípios")
+            periodo = linhas[0].get("D3N") or linhas[0].get("D2N") or ""
+            caminho = destino / "populacao.json"
+            caminho.write_text(json.dumps({"fonte": f"IBGE/SIDRA, {nome} {periodo}".strip(), "url": url, "pop": pop}, ensure_ascii=False), encoding="utf-8")
+            print(f"populacao ({nome} {periodo}): {len(pop)} municípios")
+            return caminho
+        except (requests.RequestException, ValueError, KeyError, IndexError) as erro:
+            print(f"aviso: população {nome} indisponível ({type(erro).__name__}: {str(erro)[:80]})")
+    return None
+
+
 def _uf_do_municipio(m: dict) -> str:
     # A API do IBGE às vezes traz microrregiao nula; regiao-imediata é o caminho alternativo.
     try:

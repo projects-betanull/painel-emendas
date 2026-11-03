@@ -76,7 +76,7 @@ select, .facetas input[list] { font: inherit; padding: .45rem .5rem; border: 1px
 .cab h2 { margin: .75rem 0 .5rem; font-size: 1rem; }
 .cab a { font-size: .85rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 0 .9rem; }
-.hbar { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: minmax(0, 9rem) 1fr 5.5rem; align-items: center; gap: .5rem; width: 100%; padding: .2rem 0; font-size: .85rem; }
+.hbar { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: minmax(0, 9rem) 1fr 5.5rem; align-items: center; gap: .5rem; width: 100%; min-height: 2.75rem; font-size: .9rem; }
 .hbar .rot { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hbar .trilho { height: .7rem; background: transparent; }
 .hbar .cheio, .vbar .cheio { background: var(--acento); border-radius: 0 4px 4px 0; }
@@ -89,10 +89,36 @@ select, .facetas input[list] { font: inherit; padding: .45rem .5rem; border: 1px
 .vbar .coluna { flex: 1; width: 100%; display: flex; align-items: flex-end; }
 .vbar .cheio { display: block; width: 100%; border-radius: 4px 4px 0 0; }
 .vbar .ano { font-size: .75rem; color: var(--suave); margin-top: .25rem; }
-.valor-ano { font-size: .6rem; color: var(--suave); white-space: nowrap; height: 1rem; }
+.valor-ano { font-size: .75rem; color: var(--suave); white-space: nowrap; height: 1rem; }
 @media (max-width: 30rem) { .valor-ano { visibility: hidden; } .vbar:hover .valor-ano, .vbar.sel .valor-ano { visibility: visible; } }
 .nav2 { font-weight: 600; text-decoration: none; }
 .bancada ul { columns: 2 14rem; padding-left: 1.1rem; margin: .25rem 0 .75rem; font-size: .9rem; }
 .bancada li span { color: var(--suave); font-size: .8rem; }
 .bancada h3 { font-size: .85rem; margin: .75rem 0 .25rem; color: var(--suave); }
 .bancada summary { cursor: pointer; font-weight: 600; margin: .4rem 0; }
+.menu { margin-left: auto; display: flex; gap: 1rem; }
+.menu a { font-weight: 600; text-decoration: none; padding: .5rem 0; }
+.contexto { color: var(--suave); margin: 0; }
+.resumo-texto { font-size: 1.1rem; line-height: 1.6; }
+.resumo-texto strong { color: var(--acento); }
+.acoes { display: flex; flex-wrap: wrap; gap: .5rem; }
+.botao-wpp, .botao2 { display: inline-block; padding: .7rem 1.1rem; border-radius: .6rem; font-weight: 600; text-decoration: none; min-height: 2.75rem; }
+.botao-wpp { background: #128c4b; color: #fff; }
+.botao2 { border: 2px solid var(--acento); color: var(--acento); }
+.glos { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1px solid var(--linha); font-size: .8rem; text-decoration: none; color: var(--suave); vertical-align: middle; }
+.origem, .apoio { border-top: 1px solid var(--linha); margin-top: 2rem; padding-top: 1rem; font-size: .9rem; color: var(--suave); }
+.apoio { color: var(--tinta); }
+.ultimo { margin: .75rem 0 0; }
+.atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; margin-top: 2rem; }
+.atalhos a { border: 1px solid var(--linha); border-radius: .6rem; padding: .9rem 1rem; text-decoration: none; color: var(--tinta); }
+.atalhos strong { display: block; color: var(--acento); }
+.atalhos span { font-size: .9rem; color: var(--suave); }
+.perguntas { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 1rem; }
+.perguntas a { border: 1px solid var(--linha); border-radius: 1.2rem; padding: .5rem .9rem; font-size: .9rem; text-decoration: none; min-height: 2.75rem; display: inline-flex; align-items: center; }
+.topo-dica { margin-top: 0; }
+#pivo th:first-child, #pivo td:first-child { position: sticky; left: 0; background: var(--fundo); z-index: 1; max-width: 12rem; }
+.glossario dt { font-weight: 700; margin-top: .75rem; }
+.glossario dd { margin: .25rem 0 0; }
+.dica { font-size: .875rem; }
+th { font-size: .75rem; }
+@media (max-width: 30rem) { .topo .sub { display: none; } }

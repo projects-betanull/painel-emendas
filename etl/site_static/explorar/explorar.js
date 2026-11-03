@@ -1,5 +1,7 @@
 // Explorar: tabela dinâmica (usa ../motor.js).
 "use strict";
+const UM = { ano: "ano", uf: "UF", municipio: "município", autor: "autor", tipo: "tipo", natureza: "natureza", area: "área", favorecido: "favorecido" };
+const VARIOS = { ano: "anos", uf: "UFs", municipio: "municípios", autor: "autores", tipo: "tipos", natureza: "naturezas", area: "áreas", favorecido: "favorecidos" };
 // ---------- interface
 if (typeof document !== "undefined") (async function () {
   const $ = (id) => document.getElementById(id);
@@ -50,7 +52,7 @@ if (typeof document !== "undefined") (async function () {
     $("trilha").innerHTML = '<button type="button" class="chip raiz" data-subir="*">Brasil</button>' + chips.join("");
 
     const r = pivotar(cubo, est), rotL = cubo.dims[est.lin], rotC = est.col ? cubo.dims[est.col] : null;
-    $("resumo").innerHTML = `<strong>${fmt(r.total, est.med)}</strong> em ${r.nLinhas.toLocaleString("pt-BR")} ${NOMES[est.lin].toLowerCase()}${r.nLinhas === 1 ? "" : "s"}`;
+    $("resumo").innerHTML = `<strong>${fmt(r.total, est.med)}</strong> em ${r.nLinhas.toLocaleString("pt-BR")} ${r.nLinhas === 1 ? UM[est.lin] : VARIOS[est.lin]}`;
     const cab = `<thead><tr><th>${NOMES[est.lin]}</th>${rotC ? r.cols.map((c) => `<th class="n">${esc(rotC[c])}</th>`).join("") : ""}<th class="n">Total</th></tr></thead>`;
     const corpo = r.linhas.map(([l, x]) => `<tr><td><a href="#" data-descer="${esc(rotL[l])}">${esc(rotL[l])}</a></td>${rotC ? r.cols.map((c) => `<td class="n">${x.cols.has(c) ? fmt(x.cols.get(c), est.med) : "–"}</td>`).join("") : ""}<td class="n"><strong>${fmt(x.total, est.med)}</strong></td></tr>`).join("");
     $("pivo").innerHTML = cab + "<tbody>" + corpo + "</tbody>";

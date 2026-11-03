@@ -1,5 +1,9 @@
 // Busca de municípios na página inicial: carrega busca.json (pequeno) e filtra no navegador.
 (function () {
+  try {
+    const u = JSON.parse(localStorage.getItem("ultimoMunicipio") || "null"), el = document.getElementById("ultimo");
+    if (u && el) { const a = document.createElement("a"); a.href = u.p; a.textContent = u.n; el.append("Seu último município: ", a); el.hidden = false; }
+  } catch (e) {}
   const campo = document.getElementById("q");
   const lista = document.getElementById("res");
   if (!campo || !lista) return;
