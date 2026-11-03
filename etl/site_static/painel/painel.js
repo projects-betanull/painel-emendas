@@ -8,12 +8,9 @@
     : "R$ " + Math.round(v).toLocaleString("pt-BR");
   const num = (v) => Math.round(v).toLocaleString("pt-BR");
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const TOP = { uf: 27, municipio: 10, autor: 10, tipo: 8, area: 10, natureza: 8 };
+  const TOP = { uf: 27, municipio: 10, autor: 10, tipo: 8, area: 10, natureza: 8, favorecido: 15 };
 
-  let cubo;
-  try { cubo = await (await fetch("../explorar/cubo.json")).json(); }
-  catch (e) { $("kpis").textContent = "Não foi possível carregar os dados."; return; }
-  let est = deHash(location.hash.slice(1));
+  let cubo = null, est = deHash(location.hash.slice(1));
 
   // Um gráfico de uma dimensão ignora o próprio filtro, para mostrar as alternativas
   // (filtro cruzado): os valores filtrados ficam destacados, os demais esmaecidos.
@@ -59,12 +56,18 @@
     $("trilha").innerHTML = '<button type="button" class="chip raiz" data-subir="*">Brasil</button>' + chips.join("");
     kpis(); colunasAno();
     for (const d of ["uf", "municipio", "autor", "tipo", "area", "natureza"]) barrasH(d);
+    if (cubo.dims.favorecido) barrasH("favorecido");
+    else $("g-favorecido").innerHTML = '<p class="dica">Toque numa UF ou num município para ver quem recebeu.</p>';
     const h = paraHash(est);
     $("irExplorar").href = "../explorar/#" + h;
     document.querySelectorAll(".cab a[data-dim]").forEach((a) => (a.href = "../explorar/#" + paraHash({ ...est, lin: a.dataset.dim, col: a.dataset.dim === "ano" ? "" : est.col === a.dataset.dim ? "" : est.col })));
   }
 
-  function ir(novo) { est = novo; history.replaceState(null, "", "#" + paraHash(est)); desenhar(); }
+  async function ir(novo) {
+    try { cubo = await carregarCubo(novo, "../explorar/"); } catch (e) { $("kpis").textContent = "Não foi possível carregar os dados."; return; }
+    est = ajustar(novo, cubo);
+    history.replaceState(null, "", "#" + paraHash(est)); desenhar();
+  }
 
   document.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-d],[data-subir]");
@@ -75,6 +78,6 @@
     atual.has(b.dataset.v) ? atual.delete(b.dataset.v) : atual.add(b.dataset.v);
     ir({ ...est, f: { ...est.f, [d]: [...atual] } });
   });
-  window.addEventListener("hashchange", () => { est = deHash(location.hash.slice(1)); desenhar(); });
+  window.addEventListener("hashchange", () => ir(deHash(location.hash.slice(1))));
   ir(est);
 })();

@@ -119,7 +119,12 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
     totais = df.groupby("municipio_ibge")["valor_recebido"].sum().sort_values(ascending=False)
     por_ano = df.groupby(["municipio_ibge", "ano"])["valor_recebido"].sum()
     autores = df.groupby(["municipio_ibge", "nome_autor"])["valor_recebido"].sum()
-    favorecidos = df.groupby(["municipio_ibge", "favorecido"])["valor_recebido"].sum()
+    df["fav_rotulo"] = df["favorecido"].fillna("Sem nome").astype(str)
+    if "codigo_favorecido" in df:
+        df["fav_cod"] = df["codigo_favorecido"].fillna("").astype(str)
+    else:
+        df["fav_cod"] = ""
+    favorecidos = df.groupby(["municipio_ibge", "fav_rotulo", "fav_cod"])["valor_recebido"].sum()
     tipos = df.groupby(["municipio_ibge", "tipo_emenda"])["valor_recebido"].sum()
 
     # Ranking dentro da UF, por valor total.
@@ -137,7 +142,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
         nome, uf = nomes[codigo]
         rel = caminho_municipio(nome, uf)
         top_aut = autores.loc[codigo].sort_values(ascending=False).head(10)
-        top_fav = favorecidos.loc[codigo].sort_values(ascending=False).head(10)
+        top_fav = favorecidos.loc[codigo].sort_values(ascending=False).head(20)
         top_tipo = tipos.loc[codigo].sort_values(ascending=False)
         corpo = f"""
 <p class="migalha"><a href="../../">Início</a> › {e(uf)} › {e(nome)}</p>
@@ -148,7 +153,8 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
 <section><h2>Quem mandou o dinheiro</h2>
 {tabela(["Autor da emenda", "Valor"], [[e(a), brl(v)] for a, v in top_aut.items()], {1})}</section>
 <section><h2>Quem recebeu</h2>
-{tabela(["Favorecido", "Valor"], [[e(f), brl(v)] for f, v in top_fav.items()], {1})}</section>
+{tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
+<p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={e(nome)}%20({e(uf)})">Ver todos os favorecidos no Explorar ›</a></p></section>
 <section><h2>Tipo de emenda</h2>
 {tabela(["Tipo", "Valor", "%"], [[e(t), brl(v), f"{100 * v / total:.0f}%".replace('.', ',')] for t, v in top_tipo.items()], {1, 2})}</section>
 """

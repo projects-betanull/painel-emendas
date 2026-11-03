@@ -9,24 +9,22 @@ if (typeof document !== "undefined") (async function () {
     : "R$ " + Math.round(v).toLocaleString("pt-BR");
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-  let cubo;
-  try { cubo = await (await fetch("cubo.json")).json(); }
-  catch (e) { $("resumo").textContent = "Não foi possível carregar os dados."; return; }
-  let est = deHash(location.hash.slice(1));
+  let cubo = null, est = deHash(location.hash.slice(1));
+  const dimsDe = (c) => Object.keys(NOMES).filter((d) => c.dims[d]);
 
-  for (const [id, vazio] of [["linhas", false], ["colunas", true]]) {
-    $(id).innerHTML = (vazio ? '<option value="">(nenhuma)</option>' : "") + Object.entries(NOMES).map(([d, n]) => `<option value="${d}">${n}</option>`).join("");
+  function montarControles() {
+    for (const [id, vazio] of [["linhas", false], ["colunas", true]]) {
+      $(id).innerHTML = (vazio ? '<option value="">(nenhuma)</option>' : "") + dimsDe(cubo).map((d) => `<option value="${d}">${NOMES[d]}</option>`).join("");
+    }
+    $("listas").innerHTML = dimsDe(cubo).map((d) => {
+      const r = cubo.dims[d];
+      if (r.length <= 60) return `<fieldset><legend>${NOMES[d]}</legend>${r.map((x) => `<label><input type="checkbox" data-d="${d}" value="${esc(x)}"> ${esc(x)}</label>`).join("")}</fieldset>`;
+      return `<fieldset><legend>${NOMES[d]}</legend><input list="dl-${d}" data-busca="${d}" placeholder="Digite e escolha"><datalist id="dl-${d}">${r.map((x) => `<option value="${esc(x)}">`).join("")}</datalist></fieldset>`;
+    }).join("") + (cubo.dims.favorecido ? "" : '<p class="dica">Escolha uma UF ou um município para filtrar e cruzar por favorecido.</p>');
   }
   $("linhas").onchange = () => ir({ ...est, lin: $("linhas").value, col: est.col === $("linhas").value ? "" : est.col });
   $("colunas").onchange = () => ir({ ...est, col: $("colunas").value === est.lin ? "" : $("colunas").value });
   $("medida").onchange = () => ir({ ...est, med: $("medida").value });
-
-  // Facetas: caixas de seleção para dimensões curtas, busca para as longas.
-  $("listas").innerHTML = Object.keys(NOMES).map((d) => {
-    const r = cubo.dims[d];
-    if (r.length <= 60) return `<fieldset><legend>${NOMES[d]}</legend>${r.map((x) => `<label><input type="checkbox" data-d="${d}" value="${esc(x)}"> ${esc(x)}</label>`).join("")}</fieldset>`;
-    return `<fieldset><legend>${NOMES[d]}</legend><input list="dl-${d}" data-busca="${d}" placeholder="Digite e escolha"><datalist id="dl-${d}">${r.map((x) => `<option value="${esc(x)}">`).join("")}</datalist></fieldset>`;
-  }).join("");
   $("listas").addEventListener("change", (ev) => {
     const t = ev.target, d = t.dataset.d || t.dataset.busca;
     if (!d) return;
@@ -36,7 +34,13 @@ if (typeof document !== "undefined") (async function () {
     ir({ ...est, f: { ...est.f, [d]: [...atual] } });
   });
 
-  function ir(novo) { est = novo; history.replaceState(null, "", "#" + paraHash(est)); $("irPainel").href = "../painel/#" + paraHash(est); desenhar(); }
+  async function ir(novo) {
+    let c;
+    try { c = await carregarCubo(novo, ""); } catch (e) { $("resumo").textContent = "Não foi possível carregar os dados."; return; }
+    if (c !== cubo) { cubo = c; montarControles(); }
+    est = ajustar(novo, cubo);
+    history.replaceState(null, "", "#" + paraHash(est)); $("irPainel").href = "../painel/#" + paraHash(est); desenhar();
+  }
 
   function desenhar() {
     $("linhas").value = est.lin; $("colunas").value = est.col; $("medida").value = est.med;
@@ -57,10 +61,10 @@ if (typeof document !== "undefined") (async function () {
     const a = ev.target.closest("[data-descer],[data-subir]");
     if (!a) return;
     ev.preventDefault();
-    if (a.dataset.descer !== undefined) ir(descer(est, a.dataset.descer));
+    if (a.dataset.descer !== undefined) ir(descer(est, a.dataset.descer, dimsDe(cubo)));
     else if (a.dataset.subir === "*") ir({ ...est, f: {} });
     else ir(subir(est, a.dataset.subir));
   });
-  window.addEventListener("hashchange", () => { est = deHash(location.hash.slice(1)); desenhar(); });
+  window.addEventListener("hashchange", () => ir(deHash(location.hash.slice(1))));
   ir(est);
 })();
