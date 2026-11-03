@@ -22,8 +22,18 @@ def baixar_emendas(destino: Path = config.RAW_DIR) -> Path:
         csvs = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not csvs:
             raise RuntimeError(f"ZIP sem CSV: {zf.namelist()}")
-        # Se houver mais de um CSV, o maior é a tabela principal de emendas.
-        principal = max(csvs, key=lambda n: zf.getinfo(n).file_size)
+        # O ZIP traz vários CSVs (emendas, por favorecido, convênios...). Guarda todos
+        # com o nome original e escolhe como principal o que tem valores empenhados.
+        principal = None
+        for nome in csvs:
+            dados = zf.read(nome)
+            (destino / Path(nome).name).write_bytes(dados)
+            cabecalho = dados.split(b"\n", 1)[0].decode(config.CSV_ENCODING, errors="replace")
+            print(f"zip: {nome} ({len(dados) / 1e6:.1f} MB) colunas: {cabecalho.strip()[:300]}")
+            if principal is None and "Valor Empenhado" in cabecalho:
+                principal = nome
+        if principal is None:
+            raise RuntimeError(f"nenhum CSV com 'Valor Empenhado' no ZIP: {csvs}")
         caminho = destino / "emendas.csv"
         caminho.write_bytes(zf.read(principal))
     print(f"emendas: {principal} -> {caminho} ({caminho.stat().st_size / 1e6:.1f} MB)")
