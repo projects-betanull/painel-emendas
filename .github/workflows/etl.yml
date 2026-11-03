@@ -1,0 +1,52 @@
+name: ETL diário de emendas
+
+on:
+  schedule:
+    - cron: "17 9 * * *" # 06:17 em Brasília, todo dia
+  workflow_dispatch: {} # botão "Run workflow" para rodar na mão
+
+permissions:
+  contents: read
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Vazio enquanto o segredo não for criado; o passo de publicação é pulado.
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Testes
+        run: python -m pytest -q
+
+      - name: Rodar ETL
+        run: python -m etl.build
+
+      - name: Guardar relatório de qualidade
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualidade
+          path: data/out/qualidade.json
+
+      - name: Publicar no Cloudflare R2
+        # Só roda se os segredos do R2 estiverem configurados no repositório.
+        if: ${{ env.R2_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          aws s3 sync data/out "s3://$R2_BUCKET/emendas/" \
+            --endpoint-url "$R2_ENDPOINT" --delete \
+            --cache-control "public, max-age=3600"
