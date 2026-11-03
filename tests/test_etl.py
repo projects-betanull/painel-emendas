@@ -85,3 +85,18 @@ def test_modalidade_pix(tmp_path):
         df = pd.read_csv(arq, dtype=str)
     pix = df[df["modalidade"] == "pix"]["codigo_emenda"].astype(str).tolist()
     assert sorted(pix) == ["202312340003", "202312340004", "202412340001"]
+
+
+def test_municipios_espelho(monkeypatch):
+    from etl import download
+
+    class Resp:
+        content = "codigo_ibge,nome,latitude,longitude,capital,codigo_uf,siafi_id,ddd,fuso_horario\n3509502,Campinas,-22.9,-47.0,0,35,6291,19,America/Sao_Paulo\n".encode()
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(download.requests, "get", lambda *a, **k: Resp())
+    assert download._municipios_espelho() == [
+        {"codigo_ibge": "3509502", "nome": "Campinas", "uf": "SP", "siafi": "6291"}
+    ]

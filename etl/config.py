@@ -12,6 +12,10 @@ EMENDAS_ZIP_URL = os.environ.get(
 
 # IBGE: lista de municípios com UF (código de 7 dígitos).
 IBGE_MUNICIPIOS_URL = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios"
+# Cópia pública da mesma lista, usada quando a API do IBGE não responde.
+MUNICIPIOS_ESPELHO_URL = (
+    "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv"
+)
 
 # Primeiro ano carregado.
 ANO_INICIAL = int(os.environ.get("ANO_INICIAL", "2020"))

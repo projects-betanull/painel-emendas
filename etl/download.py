@@ -1,5 +1,6 @@
 """Baixa os arquivos brutos: emendas (Portal da Transparência) e municípios (IBGE)."""
 
+import csv
 import io
 import json
 import zipfile
@@ -30,18 +31,59 @@ def baixar_emendas(destino: Path = config.RAW_DIR) -> Path:
 
 
 def baixar_municipios(destino: Path = config.RAW_DIR) -> Path:
-    """Baixa a lista de municípios do IBGE e grava um JSON simplificado."""
+    """Grava a lista de municípios (código IBGE, nome, UF) em JSON.
+
+    Tenta a API do IBGE; se ela não responder (o servidor costuma bloquear acesso
+    de fora do Brasil, como os runners do GitHub), usa uma cópia pública no GitHub.
+    """
     destino.mkdir(parents=True, exist_ok=True)
-    resp = requests.get(config.IBGE_MUNICIPIOS_URL, headers=HEADERS, timeout=120)
-    resp.raise_for_status()
-    municipios = []
-    for m in resp.json():
-        uf = _uf_do_municipio(m)
-        municipios.append({"codigo_ibge": str(m["id"]), "nome": m["nome"], "uf": uf})
+    try:
+        municipios = _municipios_ibge()
+        fonte = "IBGE"
+    except requests.RequestException as erro:
+        print(f"aviso: API do IBGE indisponível ({type(erro).__name__}); usando cópia no GitHub")
+        municipios = _municipios_espelho()
+        fonte = "espelho GitHub"
+    if len(municipios) < 5500:
+        raise RuntimeError(f"lista de municípios incompleta: {len(municipios)}")
     caminho = destino / "municipios.json"
     caminho.write_text(json.dumps(municipios, ensure_ascii=False), encoding="utf-8")
-    print(f"municipios: {len(municipios)} -> {caminho}")
+    print(f"municipios ({fonte}): {len(municipios)} -> {caminho}")
     return caminho
+
+
+def _municipios_ibge() -> list[dict]:
+    resp = requests.get(config.IBGE_MUNICIPIOS_URL, headers=HEADERS, timeout=30)
+    resp.raise_for_status()
+    return [
+        {"codigo_ibge": str(m["id"]), "nome": m["nome"], "uf": _uf_do_municipio(m)}
+        for m in resp.json()
+    ]
+
+
+# Código IBGE da UF (2 primeiros dígitos do código do município) -> sigla.
+UF_POR_CODIGO = {
+    "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA", "16": "AP", "17": "TO",
+    "21": "MA", "22": "PI", "23": "CE", "24": "RN", "25": "PB", "26": "PE", "27": "AL",
+    "28": "SE", "29": "BA", "31": "MG", "32": "ES", "33": "RJ", "35": "SP", "41": "PR",
+    "42": "SC", "43": "RS", "50": "MS", "51": "MT", "52": "GO", "53": "DF",
+}
+
+
+def _municipios_espelho() -> list[dict]:
+    """CSV público com os municípios do IBGE (kelvins/municipios-brasileiros)."""
+    resp = requests.get(config.MUNICIPIOS_ESPELHO_URL, headers=HEADERS, timeout=60)
+    resp.raise_for_status()
+    leitor = csv.DictReader(io.StringIO(resp.content.decode("utf-8-sig")))
+    return [
+        {
+            "codigo_ibge": linha["codigo_ibge"],
+            "nome": linha["nome"],
+            "uf": UF_POR_CODIGO[linha["codigo_ibge"][:2]],
+            "siafi": linha.get("siafi_id") or None,
+        }
+        for linha in leitor
+    ]
 
 
 def _uf_do_municipio(m: dict) -> str:
