@@ -129,3 +129,8 @@ def test_ano_mes(v, esperado):
 
 def test_multiplo(indice):
     assert classificar_localidade("MÚLTIPLO", indice).escopo == "multiplo"
+
+
+def test_codigo_com_uf_nula(indice):
+    assert indice.codigo("Campinas", float("nan")) is None
+    assert indice.codigo("Campinas", None) is None

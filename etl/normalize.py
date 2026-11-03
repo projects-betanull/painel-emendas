@@ -151,7 +151,7 @@ class IndiceMunicipios:
             self._codigos.add(codigo)
 
     def codigo(self, nome: str, uf: str) -> str | None:
-        uf = (uf or "").upper()
+        uf = uf.upper() if isinstance(uf, str) else ""
         chave = slug(nome)
         chave = ALIASES_MUNICIPIO.get((chave, uf), chave)
         return self._por_nome_uf.get((chave, uf))
@@ -357,7 +357,7 @@ def normalizar_favorecidos(df_bruto: pd.DataFrame, indice: IndiceMunicipios, ano
     df["uf"] = df["uf_favorecido"].map(_sigla_uf)
     pares = df[["municipio_favorecido", "uf"]].drop_duplicates()
     codigos = {
-        (m, u): (indice.codigo(m, u) if u else None)
+        (m, u): (indice.codigo(m, u) if isinstance(u, str) else None)
         for m, u in pares.itertuples(index=False)
     }
     df["municipio_ibge"] = [codigos[(m, u)] for m, u in zip(df["municipio_favorecido"], df["uf"])]
