@@ -76,6 +76,12 @@ def test_modalidade_pix(tmp_path):
 
     build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path)])
     arq = next(tmp_path.glob("fato_emenda.*"))
-    df = pd.read_parquet(arq) if arq.suffix == ".parquet" else pd.read_csv(arq, dtype=str)
+    if arq.suffix == ".parquet":
+        # Lê com DuckDB para não depender de pyarrow.
+        import duckdb
+
+        df = duckdb.sql(f"SELECT * FROM '{arq.as_posix()}'").df()
+    else:
+        df = pd.read_csv(arq, dtype=str)
     pix = df[df["modalidade"] == "pix"]["codigo_emenda"].astype(str).tolist()
     assert sorted(pix) == ["202312340003", "202312340004", "202412340001"]
