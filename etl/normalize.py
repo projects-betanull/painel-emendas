@@ -274,6 +274,15 @@ def relatorio_qualidade(df: pd.DataFrame) -> dict:
             k: {"linhas": int(v["linhas"]), "valor_pago": round(float(v["valor_pago"]), 2)}
             for k, v in por_escopo.iterrows()
         },
+        "linhas_com_codigo_ibge_no_arquivo": int(
+            df["codigo_municipio_ibge"].astype(str).str.strip().replace({"": None, "nan": None, "<NA>": None}).notna().sum()
+        ) if "codigo_municipio_ibge" in df.columns else None,
+        "localidades_top15_por_valor_pago": (
+            df.groupby(["escopo", "localidade"], dropna=False)["valor_pago"].sum()
+            .sort_values(ascending=False).head(15).round(2)
+            .rename(index=lambda x: str(x)).reset_index()
+            .apply(lambda r: f"{r['escopo']} | {r['localidade']} | {r['valor_pago']:,.0f}", axis=1).tolist()
+        ),
         "localidades_nao_resolvidas_top20": (
             df.loc[df["escopo"] == "outro"]
             .groupby("localidade", dropna=False)["valor_pago"].sum()

@@ -100,6 +100,7 @@ def main(argv=None) -> dict:
 
     qualidade = relatorio_qualidade(fato)
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
         f"qualidade: {qualidade['linhas']:,} linhas, "
         f"{qualidade['pct_valor_pago_com_municipio']}% do valor pago atribuído a um município"
