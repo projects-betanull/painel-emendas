@@ -14,11 +14,28 @@ from .normalize import UF_POR_CODIGO
 HEADERS = {"User-Agent": "painel-emendas/0.1 (dados abertos; +https://github.com/)"}
 
 
+def _baixar_zip(url: str, tentativas: int = 4, espera: int = 60) -> requests.Response:
+    """Baixa um ZIP, tentando de novo se o Portal responder com erro ou com uma página HTML."""
+    import time
+
+    for n in range(1, tentativas + 1):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=300)
+            if resp.ok and resp.content[:2] == b"PK":
+                return resp
+            motivo = f"HTTP {resp.status_code}, {resp.headers.get('content-type')}, início: {resp.content[:120]!r}"
+        except requests.RequestException as erro:
+            motivo = f"{type(erro).__name__}: {erro}"
+        print(f"aviso: download falhou (tentativa {n}/{tentativas}): {motivo}")
+        if n < tentativas:
+            time.sleep(espera * n)
+    raise RuntimeError(f"não foi possível baixar {url}")
+
+
 def baixar_emendas(destino: Path = config.RAW_DIR) -> Path:
     """Baixa o ZIP de emendas e extrai o CSV principal. Devolve o caminho do CSV."""
     destino.mkdir(parents=True, exist_ok=True)
-    resp = requests.get(config.EMENDAS_ZIP_URL, headers=HEADERS, timeout=300)
-    resp.raise_for_status()
+    resp = _baixar_zip(config.EMENDAS_ZIP_URL)
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         csvs = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not csvs:
