@@ -129,6 +129,18 @@ ALIASES_MUNICIPIO = {
     ("eldorado dos carajas", "PA"): "eldorado do carajas",
     ("sao luis do paraitinga", "SP"): "sao luiz do paraitinga",
     ("brasilia", "DF"): "brasilia",
+    # Nomes antigos que ainda aparecem no arquivo de favorecidos do Portal.
+    ("sao caitano", "PE"): "sao caetano",
+    ("santa isabel do para", "PA"): "santa izabel do para",
+    ("presidente juscelino", "RN"): "serra caiada",
+    ("itapage", "CE"): "itapaje",
+    ("iguaraci", "PE"): "iguaracy",
+    ("poxoreo", "MT"): "poxoreu",
+    ("augusto severo", "RN"): "campo grande",
+    ("trajano de morais", "RJ"): "trajano de moraes",
+    ("serido", "PB"): "sao vicente do serido",
+    ("brasopolis", "MG"): "brazopolis",
+    ("januario cicco", "RN"): "boa saude",
 }
 
 
