@@ -166,3 +166,18 @@ console.log(JSON.stringify({{top, lin: e.lin, total: r.total, ok}}));
 """
     out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout
     assert json.loads(out)["ok"], out
+
+
+def test_bancada_js():
+    import subprocess
+
+    js = Path(__file__).parent.parent / "etl" / "site_static" / "motor.js"
+    out = subprocess.run(["node", "-e", f"const m=require({json.dumps(str(js))});console.log(JSON.stringify([m.ufDaBancada('BANCADA DO CEARÁ'),m.ufDaBancada('Bancada de São Paulo'),m.ufDaBancada('FULANO'),m.legDoExercicio(2024),m.legDoExercicio(2019),m.legDoExercicio(2016)]))"],
+                         capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == ["CE", "SP", None, 57, 55, 55]
+
+
+def test_legislatura():
+    from etl.bancadas import legislatura_do_exercicio as leg
+
+    assert [leg(2016), leg(2019), leg(2020), leg(2023), leg(2024), leg(2027)] == [55, 55, 56, 56, 57, 57]

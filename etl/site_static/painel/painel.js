@@ -66,7 +66,7 @@
   async function ir(novo) {
     try { cubo = await carregarCubo(novo, "../explorar/"); } catch (e) { $("kpis").textContent = "Não foi possível carregar os dados."; return; }
     est = ajustar(novo, cubo);
-    history.replaceState(null, "", "#" + paraHash(est)); desenhar();
+    history.replaceState(null, "", "#" + paraHash(est)); mostrarBancada(est, $("bancada"), "../"); desenhar();
   }
 
   document.addEventListener("click", (ev) => {

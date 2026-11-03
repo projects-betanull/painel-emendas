@@ -91,5 +91,38 @@ async function carregarCubo(est, base) {
   catch (e) { delete _cubos[url]; if (uf) return carregarCubo({ f: {} }, base); throw e; }
 }
 
-if (typeof module !== "undefined") module.exports = { pivotar, descer, subir, paraHash, deHash, ufDoEstado, ajustar, NOMES };
+const UF_NOME = { "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM", "bahia": "BA", "ceara": "CE", "distrito federal": "DF", "espirito santo": "ES", "goias": "GO", "maranhao": "MA", "mato grosso": "MT", "mato grosso do sul": "MS", "minas gerais": "MG", "para": "PA", "paraiba": "PB", "parana": "PR", "pernambuco": "PE", "piaui": "PI", "rio de janeiro": "RJ", "rio grande do norte": "RN", "rio grande do sul": "RS", "rondonia": "RO", "roraima": "RR", "santa catarina": "SC", "sao paulo": "SP", "sergipe": "SE", "tocantins": "TO" };
+const semAcento = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+// "BANCADA DO CEARÁ" -> "CE"; outro autor -> null.
+function ufDaBancada(autor) {
+  const m = /^bancada d[aeo]s? (.+)$/.exec(semAcento(autor || "").trim());
+  return m ? UF_NOME[m[1].trim()] || null : null;
+}
+const legDoExercicio = (ano) => 55 + Math.floor((ano - 1 - 2015) / 4);
+
+let _bancadas = null;
+// Preenche o elemento `alvo` com os membros quando o filtro de autor é uma única bancada.
+async function mostrarBancada(est, alvo, raiz) {
+  const a = est.f.autor, uf = a && a.length === 1 ? ufDaBancada(a[0]) : null;
+  if (!uf) { alvo.hidden = true; alvo.innerHTML = ""; return; }
+  if (!_bancadas) _bancadas = fetch(raiz + "bancadas.json").then((r) => r.json()).catch(() => ({}));
+  const b = await _bancadas;
+  const anos = (est.f.ano || []).map(Number);
+  let legs = Object.keys(b).map(Number).sort((x, y) => y - x);
+  if (anos.length) legs = legs.filter((l) => anos.some((y) => legDoExercicio(y) === l));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const blocos = legs.filter((l) => b[l] && b[l][uf]).map((l) => {
+    const ms = b[l][uf], ini = 2015 + (l - 55) * 4;
+    const lista = (c) => ms.filter((m) => m.c === c).map((m) => `<li>${esc(m.n)} <span>${esc(m.p)}</span></li>`).join("");
+    return `<details${legs.length === 1 ? " open" : ""}><summary>${l}ª legislatura (${ini}–${ini + 4}) · emendas de ${ini + 1} a ${ini + 4}</summary>
+      <h3>Senadores</h3><ul>${lista("S")}</ul><h3>Deputados federais</h3><ul>${lista("D")}</ul></details>`;
+  });
+  alvo.hidden = false;
+  alvo.innerHTML = `<h2>Quem compõe esta bancada (${uf})</h2>` + (blocos.join("") ||
+    '<p class="dica">Composição indisponível para este período.</p>') +
+    '<p class="dica">Inclui todos que exerceram mandato na legislatura, inclusive suplentes. Fonte: Câmara e Senado.</p>';
+}
+
+if (typeof module !== "undefined") module.exports = { pivotar, descer, subir, paraHash, deHash, ufDoEstado, ajustar, ufDaBancada, legDoExercicio, NOMES };
 

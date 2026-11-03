@@ -152,6 +152,10 @@ def main(argv=None) -> dict:
 
         gravar_cubo(montar_cubo(fav, fato, municipios), args.site / "explorar")
         gravar_cubos_por_uf(fav, fato, municipios, args.site / "explorar")
+        if not args.sem_baixar:
+            from .bancadas import gravar_bancadas
+
+            gravar_bancadas(sorted(int(x) for x in fato["ano"].dropna().unique()), args.site)
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(

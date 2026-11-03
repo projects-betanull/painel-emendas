@@ -92,3 +92,7 @@ select, .facetas input[list] { font: inherit; padding: .45rem .5rem; border: 1px
 .valor-ano { font-size: .6rem; color: var(--suave); white-space: nowrap; height: 1rem; }
 @media (max-width: 30rem) { .valor-ano { visibility: hidden; } .vbar:hover .valor-ano, .vbar.sel .valor-ano { visibility: visible; } }
 .nav2 { font-weight: 600; text-decoration: none; }
+.bancada ul { columns: 2 14rem; padding-left: 1.1rem; margin: .25rem 0 .75rem; font-size: .9rem; }
+.bancada li span { color: var(--suave); font-size: .8rem; }
+.bancada h3 { font-size: .85rem; margin: .75rem 0 .25rem; color: var(--suave); }
+.bancada summary { cursor: pointer; font-weight: 600; margin: .4rem 0; }

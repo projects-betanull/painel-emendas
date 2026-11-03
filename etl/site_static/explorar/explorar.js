@@ -39,7 +39,7 @@ if (typeof document !== "undefined") (async function () {
     try { c = await carregarCubo(novo, ""); } catch (e) { $("resumo").textContent = "Não foi possível carregar os dados."; return; }
     if (c !== cubo) { cubo = c; montarControles(); }
     est = ajustar(novo, cubo);
-    history.replaceState(null, "", "#" + paraHash(est)); $("irPainel").href = "../painel/#" + paraHash(est); desenhar();
+    history.replaceState(null, "", "#" + paraHash(est)); mostrarBancada(est, $("bancada"), "../"); $("irPainel").href = "../painel/#" + paraHash(est); desenhar();
   }
 
   function desenhar() {
