@@ -111,6 +111,13 @@ UFS = {
     "SE": "sergipe", "TO": "tocantins",
 }
 UF_POR_NOME = {v: k for k, v in UFS.items()}
+# Código IBGE da UF (2 primeiros dígitos do código do município) -> sigla.
+UF_POR_CODIGO = {
+    "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA", "16": "AP", "17": "TO",
+    "21": "MA", "22": "PI", "23": "CE", "24": "RN", "25": "PB", "26": "PE", "27": "AL",
+    "28": "SE", "29": "BA", "31": "MG", "32": "ES", "33": "RJ", "35": "SP", "41": "PR",
+    "42": "SC", "43": "RS", "50": "MS", "51": "MT", "52": "GO", "53": "DF",
+}
 REGIOES = {"norte", "nordeste", "centro oeste", "sudeste", "sul"}
 
 # Grafias antigas ou alternativas comuns em bases federais -> grafia do IBGE (slug).
@@ -163,7 +170,8 @@ def classificar_localidade(texto, indice: IndiceMunicipios, codigo_ibge=None, uf
     if codigo_ibge is not None and not (isinstance(codigo_ibge, float) and pd.isna(codigo_ibge)):
         cod = re.sub(r"\D", "", str(codigo_ibge))
         if cod and indice.existe(cod):
-            return Localidade("municipal", cod, _uf_valida(uf_col))
+            # A UF sai do próprio código IBGE; a coluna UF do arquivo pode vir por extenso.
+            return Localidade("municipal", cod, UF_POR_CODIGO.get(cod[:2]))
 
     bruto = "" if texto is None or (isinstance(texto, float) and pd.isna(texto)) else str(texto).strip()
     s = slug(bruto)

@@ -100,3 +100,9 @@ def test_municipios_espelho(monkeypatch):
     assert download._municipios_espelho() == [
         {"codigo_ibge": "3509502", "nome": "Campinas", "uf": "SP", "siafi": "6291"}
     ]
+
+
+def test_uf_vem_do_codigo_ibge(indice):
+    # A coluna UF do Portal pode vir por extenso; a sigla sai do código IBGE.
+    loc = classificar_localidade("FORTALEZA", indice, codigo_ibge="2304400", uf_col="CEARÁ")
+    assert (loc.municipio_ibge, loc.uf) == ("2304400", "CE")

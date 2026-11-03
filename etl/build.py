@@ -35,7 +35,7 @@ def agregar(fato: pd.DataFrame) -> dict[str, pd.DataFrame]:
         .reset_index()
     )
     metricas_municipio["rank_uf"] = (
-        metricas_municipio.groupby(["uf", "ano"])["valor_pago"].rank(ascending=False, method="min").astype(int)
+        metricas_municipio.groupby(["uf", "ano"])["valor_pago"].rank(ascending=False, method="min").astype("Int64")
     )
 
     chave_autor = ["codigo_autor", "nome_autor"] if "codigo_autor" in fato.columns else ["nome_autor"]
