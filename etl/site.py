@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from . import config
 from .normalize import slug
 
 ESTATICOS = Path(__file__).parent / "site_static"
@@ -201,4 +202,50 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path) -> int:
         ),
         encoding="utf-8",
     )
+    gerar_apoie(destino, atualizado, desde)
     return len(totais)
+
+
+def qr_svg(texto: str) -> str:
+    """QR code em SVG (usa segno; sem ele, devolve vazio e a página mostra só o endereço)."""
+    try:
+        import segno
+    except ImportError:
+        print("aviso: segno não instalado; página Apoie sem QR code")
+        return ""
+    import io
+
+    buf = io.BytesIO()
+    segno.make(texto, error="m").save(buf, kind="svg", scale=6, border=2, xmldecl=False, svgns=True, dark="#1c1f24", light="#ffffff")
+    return buf.getvalue().decode("utf-8")
+
+
+def gerar_apoie(destino: Path, atualizado: str, desde: str) -> None:
+    endereco = config.LIGHTNING_ADDRESS
+    qr = qr_svg(f"lightning:{endereco}")
+    corpo = f"""
+<h1>Apoie o projeto ⚡</h1>
+<p>Este painel é independente, sem login e sem anúncios. Ele se mantém com contribuições em bitcoin
+pela rede Lightning, de qualquer valor.</p>
+<div class="apoie">
+{f'<a class="qr" href="lightning:{e(endereco)}" aria-label="Abrir na carteira Lightning">{qr}</a>' if qr else ''}
+<p class="endereco"><strong>{e(endereco)}</strong></p>
+<p><button type="button" id="copiar" data-endereco="{e(endereco)}">Copiar endereço</button>
+<a class="botao" href="lightning:{e(endereco)}">Abrir na carteira</a></p>
+<p class="dica">Aponte a câmera da sua carteira Lightning para o QR code, ou copie o endereço e cole na
+opção de enviar. Funciona com qualquer carteira que aceite Lightning Address.</p>
+</div>
+<script>
+document.getElementById("copiar").addEventListener("click", async (ev) => {{
+  const b = ev.currentTarget;
+  try {{ await navigator.clipboard.writeText(b.dataset.endereco); b.textContent = "Copiado ✓"; }}
+  catch (e) {{ b.textContent = b.dataset.endereco; }}
+}});
+</script>
+"""
+    pasta = destino / "apoie"
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "index.html").write_text(
+        pagina("Apoie o projeto", "Contribua com bitcoin pela rede Lightning para manter o painel no ar.", corpo, "../", atualizado, desde),
+        encoding="utf-8",
+    )

@@ -27,3 +27,6 @@ OUT_DIR = ROOT / "data" / "out"
 # Encoding e separador usados pelo Portal da Transparência.
 CSV_ENCODING = "latin-1"
 CSV_SEP = ";"
+
+# Endereço Lightning (coinos) para contribuições, mostrado na página Apoie.
+LIGHTNING_ADDRESS = os.environ.get("LIGHTNING_ADDRESS", "lizard43@coinos.io")
