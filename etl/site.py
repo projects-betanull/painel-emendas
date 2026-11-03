@@ -61,7 +61,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <body>
 <header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
 <span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<a class="nav" href="{raiz}explorar/">Explorar ›</a></header>
+<a class="nav" href="{raiz}painel/">Painel</a> <a class="nav2" href="{raiz}explorar/">Explorar ›</a></header>
 <main>
 {corpo}
 </main>

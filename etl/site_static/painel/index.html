@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel das emendas parlamentares</title>
+<meta name="description" content="Painel interativo das emendas parlamentares: valores por ano, estado, município, parlamentar, tipo e área.">
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
+<span class="sub">painel interativo</span>
+<a class="nav" id="irExplorar" href="../explorar/">Explorar ›</a></header>
+<main class="largo">
+<h1>Painel</h1>
+<nav id="trilha" class="trilha" aria-label="Filtros aplicados"></nav>
+<div id="kpis" class="kpis"><p>Carregando dados…</p></div>
+<section class="cartao"><div class="cab"><h2>Valor recebido por ano</h2><a data-dim="ano">Explorar ›</a></div><div id="g-ano" class="colunas-ano"></div></section>
+<div class="grade">
+  <section class="cartao"><div class="cab"><h2>Por UF</h2><a data-dim="uf">Explorar ›</a></div><div id="g-uf"></div></section>
+  <section class="cartao"><div class="cab"><h2>Municípios que mais receberam</h2><a data-dim="municipio">Explorar ›</a></div><div id="g-municipio"></div></section>
+  <section class="cartao"><div class="cab"><h2>Autores que mais enviaram</h2><a data-dim="autor">Explorar ›</a></div><div id="g-autor"></div></section>
+  <section class="cartao"><div class="cab"><h2>Tipo de emenda</h2><a data-dim="tipo">Explorar ›</a></div><div id="g-tipo"></div></section>
+  <section class="cartao"><div class="cab"><h2>Área</h2><a data-dim="area">Explorar ›</a></div><div id="g-area"></div></section>
+  <section class="cartao"><div class="cab"><h2>Natureza do favorecido</h2><a data-dim="natureza">Explorar ›</a></div><div id="g-natureza"></div></section>
+</div>
+</main>
+<footer><p>Toque numa barra para filtrar todo o painel. Toque num filtro acima para removê-lo. "Explorar ›" abre a tabela com os mesmos filtros.</p></footer>
+<script src="../motor.js"></script>
+<script src="painel.js"></script>
+</body>
+</html>

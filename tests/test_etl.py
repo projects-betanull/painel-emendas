@@ -155,7 +155,7 @@ def test_explorador(tmp_path):
     build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site), "--ano-inicial", "2020"])
     cubo = json.loads((site / "explorar" / "cubo.json").read_text(encoding="utf-8"))
     assert sum(cubo["valor"]) == 4_250_000  # 4 pagamentos desde 2020, inclusive sem município
-    js = Path(__file__).parent.parent / "etl" / "site_static" / "explorar" / "explorar.js"
+    js = Path(__file__).parent.parent / "etl" / "site_static" / "motor.js"
     script = f"""
 const m = require({json.dumps(str(js))}); const c = require({json.dumps(str(site / 'explorar' / 'cubo.json'))});
 let e = m.deHash('l=uf&m=valor'); let r = m.pivotar(c, e);
