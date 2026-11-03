@@ -14,28 +14,53 @@ from pathlib import Path
 import pandas as pd
 
 from . import config
-from .normalize import IndiceMunicipios, normalizar_emendas, relatorio_qualidade
+from .normalize import (
+    IndiceMunicipios,
+    normalizar_emendas,
+    normalizar_favorecidos,
+    relatorio_favorecidos,
+    relatorio_qualidade,
+)
 
 
 def ler_csv_portal(caminho: Path) -> pd.DataFrame:
     return pd.read_csv(caminho, sep=config.CSV_SEP, encoding=config.CSV_ENCODING, dtype=str, keep_default_na=False)
 
 
-def agregar(fato: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Tabelas derivadas usadas pelas páginas estáticas."""
-    mun = fato[fato["escopo"] == "municipal"]
-    metricas_municipio = (
-        mun.groupby(["municipio_ibge", "uf", "ano"], dropna=False)
-        .agg(
-            valor_empenhado=("valor_empenhado", "sum"),
-            valor_pago=("valor_pago", "sum"),
-            emendas=("codigo_emenda", "nunique"),
-            autores=("nome_autor", "nunique"),
+def agregar(fato: pd.DataFrame, fav: pd.DataFrame | None) -> dict[str, pd.DataFrame]:
+    """Tabelas derivadas usadas pelas páginas estáticas.
+
+    O total por município vem dos favorecidos (valor recebido), que é onde o
+    destino municipal aparece; sem esse arquivo, cai para a localidade da emenda.
+    """
+    if fav is not None:
+        mun = fav[fav["municipio_ibge"].notna()]
+        metricas_municipio = (
+            mun.groupby(["municipio_ibge", "uf", "ano"], dropna=False)
+            .agg(
+                valor_recebido=("valor_recebido", "sum"),
+                emendas=("codigo_emenda", "nunique"),
+                autores=("nome_autor", "nunique"),
+                favorecidos=("codigo_favorecido", "nunique"),
+            )
+            .reset_index()
         )
-        .reset_index()
-    )
+        coluna_rank = "valor_recebido"
+    else:
+        mun = fato[fato["escopo"] == "municipal"]
+        metricas_municipio = (
+            mun.groupby(["municipio_ibge", "uf", "ano"], dropna=False)
+            .agg(
+                valor_empenhado=("valor_empenhado", "sum"),
+                valor_pago=("valor_pago", "sum"),
+                emendas=("codigo_emenda", "nunique"),
+                autores=("nome_autor", "nunique"),
+            )
+            .reset_index()
+        )
+        coluna_rank = "valor_pago"
     metricas_municipio["rank_uf"] = (
-        metricas_municipio.groupby(["uf", "ano"])["valor_pago"].rank(ascending=False, method="min").astype("Int64")
+        metricas_municipio.groupby(["uf", "ano"])[coluna_rank].rank(ascending=False, method="min").astype("Int64")
     )
 
     chave_autor = ["codigo_autor", "nome_autor"] if "codigo_autor" in fato.columns else ["nome_autor"]
@@ -45,10 +70,16 @@ def agregar(fato: pd.DataFrame) -> dict[str, pd.DataFrame]:
             valor_empenhado=("valor_empenhado", "sum"),
             valor_pago=("valor_pago", "sum"),
             emendas=("codigo_emenda", "nunique"),
-            municipios=("municipio_ibge", "nunique"),
         )
         .reset_index()
     )
+    if fav is not None:
+        destinos = (
+            fav.groupby(chave_autor + ["ano"], dropna=False)
+            .agg(municipios=("municipio_ibge", "nunique"), valor_recebido=("valor_recebido", "sum"))
+            .reset_index()
+        )
+        autores = autores.merge(destinos, on=chave_autor + ["ano"], how="left")
     return {"metricas_municipio": metricas_municipio, "autores": autores}
 
 
@@ -95,16 +126,33 @@ def main(argv=None) -> dict:
     bruto = ler_csv_portal(args.raw / "emendas.csv")
     fato = normalizar_emendas(bruto, indice, args.ano_inicial)
 
-    tabelas = {"fato_emenda": fato, **agregar(fato)}
+    arq_fav = args.raw / "EmendasParlamentares_PorFavorecido.csv"
+    fav = None
+    if arq_fav.exists():
+        fav = normalizar_favorecidos(ler_csv_portal(arq_fav), indice, args.ano_inicial)
+    else:
+        print(f"aviso: {arq_fav.name} não encontrado; totais por município usam a localidade da emenda")
+
+    tabelas = {"fato_emenda": fato, **agregar(fato, fav)}
+    if fav is not None:
+        tabelas["fato_favorecido"] = fav
     gravar(tabelas, args.out)
 
     qualidade = relatorio_qualidade(fato)
+    if fav is not None:
+        qualidade["favorecidos"] = relatorio_favorecidos(fav)
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
         f"qualidade: {qualidade['linhas']:,} linhas, "
         f"{qualidade['pct_valor_pago_com_municipio']}% do valor pago atribuído a um município"
     )
+    if fav is not None:
+        f = qualidade["favorecidos"]
+        print(
+            f"favorecidos: {f['linhas']:,} linhas, {f['municipios_distintos']:,} municípios, "
+            f"{f['pct_valor_recebido_com_municipio']}% do valor recebido ligado a um município"
+        )
     return qualidade
 
 

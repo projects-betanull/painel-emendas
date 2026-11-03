@@ -134,7 +134,7 @@ ALIASES_MUNICIPIO = {
 
 @dataclass
 class Localidade:
-    escopo: str  # municipal | estadual | regional | nacional | outro
+    escopo: str  # municipal | estadual | regional | nacional | multiplo | outro
     municipio_ibge: str | None = None
     uf: str | None = None
 
@@ -179,6 +179,8 @@ def classificar_localidade(texto, indice: IndiceMunicipios, codigo_ibge=None, uf
         return Localidade("outro", None, _uf_valida(uf_col))
     if s in {"nacional", "brasil"}:
         return Localidade("nacional")
+    if s in {"multiplo", "multiplos", "multipla"}:
+        return Localidade("multiplo")
 
     # Região: "NORDESTE (REGIÃO)", "REGIÃO NORDESTE"
     sem_regiao = s.replace("regiao", "").strip()
@@ -288,5 +290,95 @@ def relatorio_qualidade(df: pd.DataFrame) -> dict:
             .groupby("localidade", dropna=False)["valor_pago"].sum()
             .sort_values(ascending=False).head(20).round(2)
             .rename(index=lambda x: str(x)).to_dict()
+        ),
+    }
+
+
+# --------------------------------------------------------------------------- favorecidos
+# EmendasParlamentares_PorFavorecido.csv: quem recebeu o dinheiro de cada emenda,
+# com município e UF do favorecido. É aqui que está o destino municipal, já que no
+# arquivo principal a maior parte do valor vem com localidade "MÚLTIPLO".
+
+COLUNAS_FAVORECIDO = {
+    "codigo_emenda": ["codigo da emenda"],
+    "codigo_autor": ["codigo do autor da emenda"],
+    "nome_autor": ["nome do autor da emenda"],
+    "numero_emenda": ["numero da emenda"],
+    "tipo_emenda": ["tipo de emenda"],
+    "ano_mes": ["ano mes", "mes ano"],
+    "codigo_favorecido": ["codigo do favorecido"],
+    "favorecido": ["favorecido", "nome do favorecido"],
+    "natureza_juridica": ["natureza juridica"],
+    "tipo_favorecido": ["tipo favorecido"],
+    "uf_favorecido": ["uf favorecido"],
+    "municipio_favorecido": ["municipio favorecido"],
+    "valor_recebido": ["valor recebido"],
+}
+OBRIGATORIAS_FAVORECIDO = ["codigo_emenda", "ano_mes", "municipio_favorecido", "uf_favorecido", "valor_recebido"]
+
+
+def _ano_mes(v) -> tuple[int | None, int | None]:
+    """'202403', '2024/03', '03/2024', '2024-03' -> (2024, 3)."""
+    digitos = re.findall(r"\d+", str(v or ""))
+    if len(digitos) == 1 and len(digitos[0]) == 6:
+        return int(digitos[0][:4]), int(digitos[0][4:])
+    ano = next((int(d) for d in digitos if len(d) == 4), None)
+    mes = next((int(d) for d in digitos if len(d) <= 2), None)
+    return ano, mes
+
+
+def _sigla_uf(v) -> str | None:
+    s = slug(v)
+    if s.upper() in UFS:
+        return s.upper()
+    return UF_POR_NOME.get(s)
+
+
+def normalizar_favorecidos(df_bruto: pd.DataFrame, indice: IndiceMunicipios, ano_inicial: int) -> pd.DataFrame:
+    por_slug = {slug(c): c for c in df_bruto.columns}
+    mapa = {}
+    for canonico, opcoes in COLUNAS_FAVORECIDO.items():
+        for op in opcoes:
+            if op in por_slug:
+                mapa[por_slug[op]] = canonico
+                break
+    faltando = [c for c in OBRIGATORIAS_FAVORECIDO if c not in mapa.values()]
+    if faltando:
+        raise ValueError(f"Favorecidos: colunas não encontradas {faltando}. Arquivo: {list(df_bruto.columns)}")
+    df = df_bruto.rename(columns=mapa)[list(mapa.values())].copy()
+
+    am = df["ano_mes"].map(_ano_mes)
+    df["ano"] = pd.array([a for a, _ in am], dtype="Int64")
+    df["mes"] = pd.array([m for _, m in am], dtype="Int64")
+    df = df[df["ano"] >= ano_inicial].copy()
+    df["valor_recebido"] = df["valor_recebido"].map(valor_br)
+
+    # Muitos favorecidos se repetem: resolve cada par (município, UF) uma vez só.
+    df["uf"] = df["uf_favorecido"].map(_sigla_uf)
+    pares = df[["municipio_favorecido", "uf"]].drop_duplicates()
+    codigos = {
+        (m, u): (indice.codigo(m, u) if u else None)
+        for m, u in pares.itertuples(index=False)
+    }
+    df["municipio_ibge"] = [codigos[(m, u)] for m, u in zip(df["municipio_favorecido"], df["uf"])]
+    for c in ["codigo_emenda", "codigo_autor", "nome_autor", "tipo_emenda", "favorecido", "tipo_favorecido"]:
+        if c in df.columns:
+            df[c] = df[c].astype("string").str.strip()
+    return df.reset_index(drop=True)
+
+
+def relatorio_favorecidos(df: pd.DataFrame) -> dict:
+    total = float(df["valor_recebido"].sum()) or 1.0
+    com = df["municipio_ibge"].notna()
+    return {
+        "linhas": int(len(df)),
+        "valor_recebido_total": round(float(df["valor_recebido"].sum()), 2),
+        "pct_valor_recebido_com_municipio": round(100 * float(df.loc[com, "valor_recebido"].sum()) / total, 1),
+        "municipios_distintos": int(df["municipio_ibge"].nunique()),
+        "nao_resolvidos_top20": (
+            df.loc[~com]
+            .assign(chave=lambda d: d["municipio_favorecido"].astype(str) + " / " + d["uf_favorecido"].astype(str))
+            .groupby("chave")["valor_recebido"].sum()
+            .sort_values(ascending=False).head(20).round(2).to_dict()
         ),
     }

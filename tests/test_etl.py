@@ -106,3 +106,26 @@ def test_uf_vem_do_codigo_ibge(indice):
     # A coluna UF do Portal pode vir por extenso; a sigla sai do código IBGE.
     loc = classificar_localidade("FORTALEZA", indice, codigo_ibge="2304400", uf_col="CEARÁ")
     assert (loc.municipio_ibge, loc.uf) == ("2304400", "CE")
+
+
+def test_favorecidos(tmp_path):
+    q = build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path), "--ano-inicial", "2020"])
+    f = q["favorecidos"]
+    assert f["linhas"] == 4  # a linha de 2019 sai
+    assert f["valor_recebido_total"] == pytest.approx(4_250_000.50)
+    # Campinas 750.000,50 + Fortaleza 3.000.000 = 3.750.000,50 de 4.250.000,50
+    assert f["pct_valor_recebido_com_municipio"] == pytest.approx(88.2, abs=0.1)
+    assert f["municipios_distintos"] == 2
+    assert "CIDADE INEXISTENTE / MG" in f["nao_resolvidos_top20"]
+    assert (tmp_path / "fato_favorecido.csv").exists() or (tmp_path / "fato_favorecido.parquet").exists()
+
+
+@pytest.mark.parametrize("v,esperado", [("202403", (2024, 3)), ("05/2025", (2025, 5)), ("2023-11", (2023, 11)), ("", (None, None))])
+def test_ano_mes(v, esperado):
+    from etl.normalize import _ano_mes
+
+    assert _ano_mes(v) == esperado
+
+
+def test_multiplo(indice):
+    assert classificar_localidade("MÚLTIPLO", indice).escopo == "multiplo"
