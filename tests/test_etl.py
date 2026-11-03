@@ -134,3 +134,15 @@ def test_multiplo(indice):
 def test_codigo_com_uf_nula(indice):
     assert indice.codigo("Campinas", float("nan")) is None
     assert indice.codigo("Campinas", None) is None
+
+
+def test_site(tmp_path):
+    site = tmp_path / "site"
+    build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site)])
+    inicio = (site / "index.html").read_text(encoding="utf-8")
+    assert "Fortaleza" in inicio and "Campinas" in inicio
+    campinas = (site / "municipio" / "campinas-sp" / "index.html").read_text(encoding="utf-8")
+    assert "R$ 750.000" in campinas and "FULANO DE TAL" in campinas
+    busca = json.loads((site / "busca.json").read_text(encoding="utf-8"))
+    assert {m["n"] for m in busca} == {"Campinas", "Fortaleza"}
+    assert (site / "estilo.css").exists() and (site / "apoie" / "index.html").exists()

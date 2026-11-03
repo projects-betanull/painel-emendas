@@ -15,6 +15,9 @@ jobs:
     env:
       # Vazio enquanto o segredo não for criado; o passo de publicação é pulado.
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      # Vazio enquanto o segredo não for criado; a publicação do site é pulada.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +40,13 @@ jobs:
         with:
           name: qualidade
           path: data/out/qualidade.json
+
+      - name: Publicar o site no Cloudflare Pages
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          # Cria o projeto na primeira vez; nas seguintes o comando só avisa que já existe.
+          npx --yes wrangler@4 pages project create painel-emendas --production-branch=main || true
+          npx --yes wrangler@4 pages deploy site --project-name=painel-emendas --branch=main --commit-dirty=true
 
       - name: Publicar no Cloudflare R2
         # Só roda se os segredos do R2 estiverem configurados no repositório.

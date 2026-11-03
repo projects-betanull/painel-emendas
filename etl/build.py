@@ -113,6 +113,7 @@ def main(argv=None) -> dict:
     p.add_argument("--raw", type=Path, default=config.RAW_DIR)
     p.add_argument("--out", type=Path, default=config.OUT_DIR)
     p.add_argument("--ano-inicial", type=int, default=config.ANO_INICIAL)
+    p.add_argument("--site", type=Path, default=config.ROOT / "site", help="pasta do site estático gerado")
     args = p.parse_args(argv)
 
     if not args.sem_baixar:
@@ -141,6 +142,10 @@ def main(argv=None) -> dict:
     qualidade = relatorio_qualidade(fato)
     if fav is not None:
         qualidade["favorecidos"] = relatorio_favorecidos(fav)
+        from .site import gerar_site
+
+        paginas = gerar_site(fav, municipios, args.site)
+        print(f"site: {paginas:,} páginas de município -> {args.site}")
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
