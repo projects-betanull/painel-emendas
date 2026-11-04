@@ -46,14 +46,14 @@ jobs:
       - name: Publicar o site e o MCP no Cloudflare Pages
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         env:
-          COINOS_TOKEN: ${{ secrets.COINOS_TOKEN }}
           ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
         run: |
           # Cria o projeto na primeira vez; nas seguintes o comando só avisa que já existe.
           npx --yes wrangler@4 pages project create painel-emendas --production-branch=main || true
           # Segredos das funções (MCP e gestão); só os que existirem no GitHub.
-          jq -n --arg c "$COINOS_TOKEN" --arg a "$ADMIN_KEY" \
-            '{COINOS_TOKEN: $c, ADMIN_KEY: $a, TOKEN_SECRET: (if $c != "" then ($c + "|" + $a) else "" end)} | with_entries(select(.value != ""))' > /tmp/segredos.json
+          # TOKEN_SECRET assina os passes; deriva da ADMIN_KEY para não exigir outro segredo.
+          jq -n --arg a "$ADMIN_KEY" --arg t "$(printf '%s' "passe-mcp|$ADMIN_KEY" | sha256sum | cut -d' ' -f1)" \
+            '{ADMIN_KEY: $a, TOKEN_SECRET: (if $a != "" then $t else "" end)} | with_entries(select(.value != ""))' > /tmp/segredos.json
           if [ "$(jq length /tmp/segredos.json)" -gt 0 ]; then npx --yes wrangler@4 pages secret bulk /tmp/segredos.json --project-name=painel-emendas; fi
           rm -f /tmp/segredos.json
           # A pasta functions/ (MCP em /mcp e /api/gestao) vai junto com o site.

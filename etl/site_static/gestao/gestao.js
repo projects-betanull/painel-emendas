@@ -12,12 +12,9 @@ async function carregar(chave) {
   const g = await r.json();
   sessionStorage.setItem("chave", chave);
   $("entrar").hidden = true; $("painel").hidden = false;
-  const pags = g.pagamentos || [];
-  const mcp = pags.filter((p) => /painel-emendas/.test(p.memo) && p.sats > 0);
-  $("kpis").innerHTML = [["Saldo (sats)", num(g.saldo_sats)], ["Passes MCP vendidos", num(mcp.length)], ["Receita MCP (sats)", num(mcp.reduce((a, p) => a + Number(p.sats || 0), 0))], ["Preço do passe", num(g.configurado?.preco_sats) + " sats"]]
+  $("kpis").innerHTML = [["Preço do passe", (g.configurado?.preco_sats ?? "–") + " sats"], ["Recebe em", esc(g.configurado?.endereco)], ["Passes assinados", g.configurado?.assinatura_tokens ? "✓ sim" : "✗ falta ADMIN_KEY"]]
     .map(([t, v]) => `<div class="kpi"><span>${t}</span><strong>${v}</strong></div>`).join("");
-  $("vendas").innerHTML = g.configurado?.coinos ? tab(["Quando", "Sats", "Descrição", "Tipo"], pags.map((p) => [data(p.quando), num(p.sats), esc(p.memo), esc(p.tipo)]))
-    : "<p>Coinos não configurado: cadastre o segredo COINOS_TOKEN no GitHub.</p>";
+  $("vendas").innerHTML = '<p>As vendas caem direto na sua carteira coinos, com a descrição "painel-emendas: passe MCP 24h". Veja saldo e histórico no app do coinos. Cada compra e ativação também aparece nos registros em tempo real do Cloudflare (ferramentas comprar_acesso e ativar_acesso).</p><p><a href="https://coinos.io/">Abrir o coinos ›</a></p>';
 
   try {
     const runs = (await (await fetch("https://api.github.com/repos/projects-betanull/painel-emendas/actions/runs?per_page=15")).json()).workflow_runs || [];

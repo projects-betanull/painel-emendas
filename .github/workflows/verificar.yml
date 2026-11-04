@@ -22,4 +22,9 @@ jobs:
           echo "api/m direto (esperado 403): $(curl -s -o /dev/null -w '%{http_code}' $B/api/m/3509502.json)"
           echo "gestao sem chave (esperado 401): $(curl -s -o /dev/null -w '%{http_code}' $B/api/gestao)"
           for p in / painel/ explorar/ ia/ sobre/ gestao/ sitemap.xml llms.txt; do echo "$p $(curl -s -o /dev/null -w '%{http_code}' $B/$p)"; done
+          echo "--- LNURL do endereço"; curl -fsS https://coinos.io/.well-known/lnurlp/lizard43 | jq -c '{callback, minSendable, maxSendable, commentAllowed}'
+          F=$(rpc '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"comprar_acesso","arguments":{}}}' | jq -r '.result.content[0].text' | jq -r .fatura_id)
+          echo "fatura: ${F:0:30}..."
+          echo "--- consulta da fatura no coinos (chaves)"; curl -fsS "https://coinos.io/api/invoice/$F" | jq -c '{received, amount, created, keys: keys}'
+          rpc "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"ativar_acesso\",\"arguments\":{\"fatura_id\":\"$F\"}}}" | jq -r '.result.content[0].text'
           curl -fsS "https://registry.modelcontextprotocol.io/v0.1/servers?search=painel-emendas" | jq -c '.servers[0].server | {name, version}'
