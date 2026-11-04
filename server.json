@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.projects-betanull/painel-emendas",
+  "title": "Emendas parlamentares do Brasil",
+  "description": "Brazilian federal budget amendments by municipality, author and recipient. Paid via Lightning.",
+  "version": "1.0.0",
+  "websiteUrl": "https://painel-emendas.pages.dev/ia/",
+  "repository": { "url": "https://github.com/projects-betanull/painel-emendas", "source": "github" },
+  "remotes": [{ "type": "streamable-http", "url": "https://painel-emendas.pages.dev/mcp" }]
+}

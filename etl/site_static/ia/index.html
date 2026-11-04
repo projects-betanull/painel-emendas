@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use com IA: servidor MCP das emendas parlamentares</title>
+<meta name="description" content="Conecte Claude, ChatGPT ou outro assistente aos dados de emendas parlamentares pelo servidor MCP, com pagamento em Lightning.">
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
+<nav class="menu"><a href="../painel/">Painel</a><a href="../explorar/">Explorar</a><a href="../sobre/">Fontes</a></nav></header>
+<main>
+<h1>Use com IA (MCP)</h1>
+<p>Assistentes de IA compatíveis com o <strong>Model Context Protocol</strong> podem consultar estes dados diretamente.
+Endereço do servidor (Streamable HTTP):</p>
+<pre class="codigo">https://painel-emendas.pages.dev/mcp</pre>
+<h2>Ferramentas</h2>
+<div class="tabela"><table><thead><tr><th>Ferramenta</th><th>O que faz</th><th>Custo</th></tr></thead><tbody>
+<tr><td>buscar_municipio</td><td>Acha o município e o código IBGE</td><td>Grátis</td></tr>
+<tr><td>resumo_municipio</td><td>Total e valor por habitante; com passe, por ano, autores, favorecidos, áreas e tipos</td><td>Grátis / passe</td></tr>
+<tr><td>ranking_municipios</td><td>Ranking por total e por habitante, no Brasil ou numa UF</td><td>Passe</td></tr>
+<tr><td>comprar_acesso</td><td>Gera a fatura Lightning do passe de 24 h</td><td>—</td></tr>
+<tr><td>ativar_acesso</td><td>Confere o pagamento e entrega o token</td><td>—</td></tr>
+</tbody></table></div>
+<h2>Como pagar</h2>
+<ol>
+<li>Peça ao assistente para chamar <code>comprar_acesso</code>. Ele recebe uma fatura Lightning de 1.000 sats.</li>
+<li>Pague com qualquer carteira Lightning (ou deixe um agente com carteira pagar sozinho).</li>
+<li>O assistente chama <code>ativar_acesso</code> e recebe um token válido por 24 horas, sem cadastro e sem login.</li>
+</ol>
+<h2>Configuração</h2>
+<p>Em clientes que aceitam servidores remotos, adicione um servidor do tipo HTTP com o endereço acima. Exemplo de configuração JSON:</p>
+<pre class="codigo">{ "mcpServers": { "emendas": { "type": "http", "url": "https://painel-emendas.pages.dev/mcp" } } }</pre>
+<p class="dica">Fonte dos dados: Portal da Transparência (CGU). Valores reproduzidos como publicados; não constituem juízo sobre legalidade. <a href="../sobre/">Fontes, método e limites</a>.</p>
+</main>
+<footer><p>Site independente e não oficial. Código aberto: <a href="https://github.com/projects-betanull/painel-emendas">GitHub</a>.</p></footer>
+</body>
+</html>

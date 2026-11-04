@@ -1,0 +1,26 @@
+name: Publicar no registro oficial de MCP
+
+on:
+  push:
+    branches: [main]
+    paths: [server.json]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # login sem segredo via OIDC do GitHub
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher \
+            || { curl -fsSL -o mcp-publisher "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher-linux-amd64" && chmod +x mcp-publisher; }
+          ./mcp-publisher --help | head -3
+      - name: Publicar
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

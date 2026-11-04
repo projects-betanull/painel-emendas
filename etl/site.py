@@ -88,7 +88,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <body>
 <header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
 <span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}sobre/">Fontes</a></nav></header>
+<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a></nav></header>
 <main>
 {corpo}
 </main>
@@ -383,3 +383,74 @@ document.getElementById("copiar").addEventListener("click", async (ev) => {{
         pagina("Apoie o projeto", "Contribua com bitcoin pela rede Lightning para manter o painel no ar.", corpo, "../", atualizado, desde, "apoie/"),
         encoding="utf-8",
     )
+
+
+def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populacao: dict | None, fato: pd.DataFrame | None,
+              qualidade: dict | None = None) -> None:
+    """Arquivos JSON pequenos lidos pelo servidor MCP (um por município + rankings)."""
+    api = destino / "api"
+    (api / "m").mkdir(parents=True, exist_ok=True)
+    (api / "ranking").mkdir(parents=True, exist_ok=True)
+    nomes = {str(m["codigo_ibge"]): (m["nome"], m["uf"]) for m in municipios}
+    pop = {str(k): int(v) for k, v in (populacao or {}).get("pop", {}).items()}
+    df = fav[fav["municipio_ibge"].notna()].copy()
+    df["municipio_ibge"] = df["municipio_ibge"].astype(str)
+    if fato is not None and "funcao" in fato.columns:
+        area = fato.dropna(subset=["funcao"]).groupby("codigo_emenda")["funcao"].agg(lambda s: s.mode().iat[0])
+        df["area"] = df["codigo_emenda"].map(area).fillna("Não informada")
+    else:
+        df["area"] = "Não informada"
+    df["doc"] = df["codigo_favorecido"].fillna("").astype(str).map(mascarar_documento) if "codigo_favorecido" in df else ""
+    fonte = {"fonte": "Portal da Transparência (CGU), arquivo de emendas por favorecido", "url": PORTAL_DOWNLOAD,
+             "aviso": "Valores reproduzidos como publicados pela fonte oficial; não constituem juízo sobre legalidade."}
+    def top(g, n):
+        return [{"nome": k if not isinstance(k, tuple) else k[0], **({"documento": k[1]} if isinstance(k, tuple) else {}), "valor": round(float(v), 2)}
+                for k, v in g.sort_values(ascending=False).head(n).items()]
+    linhas = []
+    for cod, parte in df.groupby("municipio_ibge"):
+        if cod not in nomes:
+            continue
+        total = float(parte["valor_recebido"].sum())
+        p = pop.get(cod)
+        info = {
+            "codigo_ibge": cod, "municipio": nomes[cod][0], "uf": nomes[cod][1], "total_recebido": round(total, 2),
+            "populacao": p, "por_habitante": round(total / p, 2) if p else None,
+            "por_ano": {str(int(a)): round(float(v), 2) for a, v in parte.groupby("ano")["valor_recebido"].sum().items()},
+            "autores": top(parte.groupby("nome_autor")["valor_recebido"].sum(), 15),
+            "favorecidos": top(parte.groupby(["favorecido", "doc"])["valor_recebido"].sum(), 15),
+            "areas": top(parte.groupby("area")["valor_recebido"].sum(), 10),
+            "tipos": top(parte.groupby("tipo_emenda")["valor_recebido"].sum(), 10),
+            "pagina": f"{config.SITE_URL}/{caminho_municipio(*nomes[cod])}", **fonte,
+        }
+        (api / "m" / f"{cod}.json").write_text(json.dumps(info, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        linhas.append({"codigo_ibge": cod, "municipio": nomes[cod][0], "uf": nomes[cod][1], "total": round(total, 2),
+                       "por_habitante": info["por_habitante"], "populacao": p})
+    tab = pd.DataFrame(linhas)
+    for uf in ["BR"] + sorted(tab["uf"].unique()):
+        t = tab if uf == "BR" else tab[tab["uf"] == uf]
+        grandes = t[t["populacao"].fillna(0) >= POP_MIN_DESTAQUE]
+        rk = {"uf": uf, "por_total": t.sort_values("total", ascending=False).head(50).to_dict("records"),
+              "por_habitante_acima_50mil": grandes.sort_values("por_habitante", ascending=False).head(50).to_dict("records"), **fonte}
+        (api / "ranking" / f"{uf}.json").write_text(json.dumps(rk, ensure_ascii=False, separators=(",", ":"), default=lambda x: None), encoding="utf-8")
+    (api / "indice.json").write_text(json.dumps({f"{n}|{u}": c for c, (n, u) in nomes.items()}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    # Descoberta: robots, sitemap e llms.txt para buscadores e assistentes de IA.
+    urls = ["", "painel/", "explorar/", "sobre/", "ia/", "apoie/"] + [caminho_municipio(*nomes[l["codigo_ibge"]]) for l in linhas]
+    (destino / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        + "".join(f"<url><loc>{config.SITE_URL}/{html.escape(u)}</loc></url>" for u in urls) + "</urlset>\n", encoding="utf-8")
+    (destino / "robots.txt").write_text(f"User-agent: *\nAllow: /\nDisallow: /gestao/\nSitemap: {config.SITE_URL}/sitemap.xml\n", encoding="utf-8")
+    (destino / "llms.txt").write_text(f"""# Emendas parlamentares do Brasil
+
+> Quanto cada município recebeu em emendas parlamentares federais, de quais parlamentares e para quem. Dados do Portal da Transparência (CGU), de 2014 em diante, atualizados diariamente.
+
+## Para agentes de IA
+- Servidor MCP (Streamable HTTP): {config.SITE_URL}/mcp — ferramentas buscar_municipio e resumo_municipio gratuitas; detalhes e rankings com passe de 24 h pago em Lightning.
+- Documentação: {config.SITE_URL}/ia/
+
+## Páginas
+- [Painel]({config.SITE_URL}/painel/)
+- [Explorar]({config.SITE_URL}/explorar/)
+- [Fontes, método e limites]({config.SITE_URL}/sobre/)
+""", encoding="utf-8")
+    if qualidade:
+        (api / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False), encoding="utf-8")
+    print(f"api: {len(linhas):,} municípios, {len(tab['uf'].unique()) + 1} rankings")

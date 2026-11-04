@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Gestão</title>
+<link rel="stylesheet" href="../estilo.css">
+</head>
+<body>
+<header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
+<nav class="menu"><a href="../painel/">Painel</a><a href="../explorar/">Explorar</a><a href="../sobre/">Fontes</a></nav></header>
+<main class="largo">
+<h1>Gestão</h1>
+<form id="entrar" class="controles"><label>Chave de administração <input id="chave" type="password" autocomplete="current-password"></label><button>Entrar</button></form>
+<div id="painel" hidden>
+<div id="kpis" class="kpis"></div>
+<section class="cartao"><div class="cab"><h2>Vendas e pagamentos (coinos)</h2></div><div id="vendas" class="tabela"></div></section>
+<section class="cartao"><div class="cab"><h2>Atualizações dos dados (ETL)</h2><a href="https://github.com/projects-betanull/painel-emendas/actions">GitHub ›</a></div><div id="etl" class="tabela"></div></section>
+<section class="cartao"><div class="cab"><h2>Qualidade dos dados</h2></div><div id="qual"></div></section>
+<section class="cartao"><div class="cab"><h2>Acessos e registros</h2></div>
+<p>Visitas ao site: no painel do Cloudflare, em <strong>Workers &amp; Pages › painel-emendas › Metrics</strong> (ative o Web Analytics uma vez em <strong>Settings</strong>).</p>
+<p>Chamadas ao MCP: em <strong>Workers &amp; Pages › painel-emendas › Functions › Real-time logs</strong>. Cada chamada registra ferramenta, erro e tempo.</p>
+<p><a href="https://dash.cloudflare.com/">Abrir o Cloudflare ›</a> · <a href="https://coinos.io/">Abrir o coinos ›</a></p></section>
+</div>
+</main>
+<script src="gestao.js"></script>
+</body>
+</html>

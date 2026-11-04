@@ -157,6 +157,9 @@ def main(argv=None) -> dict:
 
         gravar_cubo(montar_cubo(fav, fato, municipios), args.site / "explorar")
         gravar_cubos_por_uf(fav, fato, municipios, args.site / "explorar")
+        from .site import gerar_api
+
+        gerar_api(args.site, fav, municipios, populacao, fato, qualidade)
         if not args.sem_baixar:
             from .bancadas import gravar_bancadas
 
