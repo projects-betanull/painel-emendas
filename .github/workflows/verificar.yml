@@ -1,0 +1,25 @@
+name: Verificar site e MCP no ar
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["ETL diário de emendas"]
+    types: [completed]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Testar
+        run: |
+          set -e
+          B=https://painel-emendas.pages.dev
+          rpc() { curl -fsS -X POST "$B/mcp" -H 'content-type: application/json' -d "$1"; echo; }
+          rpc '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' | head -c 300; echo
+          rpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | jq -r '.result.tools[].name'
+          rpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"buscar_municipio","arguments":{"nome":"campinas"}}}' | jq -r '.result.content[0].text' | head -c 400; echo
+          rpc '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resumo_municipio","arguments":{"codigo_ibge":"3509502"}}}' | jq -r '.result.content[0].text' | head -c 400; echo
+          echo "api/m direto (esperado 403): $(curl -s -o /dev/null -w '%{http_code}' $B/api/m/3509502.json)"
+          echo "gestao sem chave (esperado 401): $(curl -s -o /dev/null -w '%{http_code}' $B/api/gestao)"
+          for p in / painel/ explorar/ ia/ sobre/ gestao/ sitemap.xml llms.txt; do echo "$p $(curl -s -o /dev/null -w '%{http_code}' $B/$p)"; done
+          curl -fsS "https://registry.modelcontextprotocol.io/v0.1/servers?search=painel-emendas" | jq -c '.servers[0].server | {name, version}'
