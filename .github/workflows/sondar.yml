@@ -1,0 +1,20 @@
+name: Sondar fontes novas
+on: { workflow_dispatch: {} }
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apoiadores (ADPF 854)
+        run: |
+          curl -sL -A "Mozilla/5.0" https://portaldatransparencia.gov.br/emendas/adpf854 -o a.html; echo "status/size: $(wc -c < a.html)"
+          grep -oiE 'href="[^"]+\.(xlsx?|csv|zip|ods|pdf)"' a.html | sort -u | head -40
+      - name: PNCP contratos (Prefeitura de Campinas, 90 dias)
+        run: |
+          D1=$(date -d '-90 days' +%Y%m%d); D2=$(date +%Y%m%d)
+          curl -s -o p.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=$D1&dataFinal=$D2&cnpjOrgao=51885242000140&pagina=1&tamanhoPagina=10"
+          head -c 1500 p.json; echo
+          curl -s -o q.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/pncp/v1/orgaos/51885242000140/contratos?pagina=1&tamanhoPagina=5"; head -c 600 q.json; echo
+      - name: Emendas apresentadas 2002–2013 (Câmara/Senado)
+        run: |
+          for u in "https://www12.senado.leg.br/orcamento/documentos/loa" "https://www2.camara.leg.br/orcamento-da-uniao/leis-orcamentarias/loa" "https://dadosabertos.camara.leg.br/swagger/api.html"; do
+            echo "== $u"; curl -sL -A "Mozilla/5.0" "$u" -o c.html -w "HTTP %{http_code} " ; wc -c < c.html; grep -oiE 'href="[^"]*(emenda|Emenda)[^"]*"' c.html | sort -u | head -15; done
