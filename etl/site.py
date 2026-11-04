@@ -125,6 +125,15 @@ def barras_ano(por_ano: pd.Series) -> str:
     return f'<div class="barras">{itens}</div>'
 
 
+def cnpj_prefeitura(favs: pd.Series) -> str:
+    """CNPJ da prefeitura entre os favorecidos: 'MUNICIPIO DE …' ou 'PREFEITURA …' com CNPJ válido."""
+    for (nome, doc), _ in favs.items():
+        dig = re.sub(r"\D", "", str(doc))
+        if len(dig) == 14 and re.match(r"^(MUNIC[IÍ]PIO|PREFEITURA)", str(nome).strip().upper()):
+            return dig
+    return ""
+
+
 def glossario(termo: str, texto: str, raiz: str) -> str:
     return f'<a class="glos" href="{raiz}sobre/#{termo}" title="{e(texto)}">?</a>'
 
@@ -185,6 +194,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
         b = base.loc[codigo]
         top_aut = autores.loc[codigo].sort_values(ascending=False).head(10)
         top_fav = favorecidos.loc[codigo].sort_values(ascending=False).head(20)
+        top_fav_todos = favorecidos.loc[codigo].sort_values(ascending=False)
         top_tipo = tipos.loc[codigo].sort_values(ascending=False)
         top_area = areas.loc[codigo].sort_values(ascending=False)
 
@@ -220,6 +230,10 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 <section><h2>Quem recebeu {glossario("favorecido", "Quem recebeu o dinheiro direto da União: prefeitura, fundo, entidade.", "../../")}</h2>
 {tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
 <p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a></p></section>
+<section id="contratos" data-cnpj="{e(cnpj_prefeitura(top_fav_todos))}" hidden><h2>Empresas contratadas pela prefeitura</h2>
+<p class="dica">Contratos dos últimos 12 meses publicados no <a href="https://pncp.gov.br/">PNCP</a>. Os dados públicos não indicam quais foram pagos com dinheiro de emendas.</p>
+<div class="conteudo">Carregando…</div></section>
+<script src="../../contratos.js" defer></script>
 <section><h2>Tipo de emenda {glossario("tipo", "Individual, de bancada, de comissão ou de relator; transferências especiais são as Emendas Pix.", "../../")}</h2>
 {tabela(["Tipo", "Valor", "%"], [[e(t), brl(v), pct(100 * v / total)] for t, v in top_tipo.items()], {1, 2})}</section>
 <aside class="origem"><strong>De onde vêm estes números:</strong> soma do campo "Valor Recebido" do arquivo de favorecidos do
@@ -420,6 +434,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
             "favorecidos": top(parte.groupby(["favorecido", "doc"])["valor_recebido"].sum(), 15),
             "areas": top(parte.groupby("area")["valor_recebido"].sum(), 10),
             "tipos": top(parte.groupby("tipo_emenda")["valor_recebido"].sum(), 10),
+            "cnpj_prefeitura": cnpj_prefeitura(parte.groupby(["favorecido", "doc"])["valor_recebido"].sum().sort_values(ascending=False)) or None,
             "pagina": f"{config.SITE_URL}/{caminho_municipio(*nomes[cod])}", **fonte,
         }
         (api / "m" / f"{cod}.json").write_text(json.dumps(info, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

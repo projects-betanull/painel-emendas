@@ -124,3 +124,4 @@ th { font-size: .75rem; }
 @media (max-width: 30rem) { .topo .sub { display: none; } }
 .codigo { background: var(--acento-claro); padding: .75rem 1rem; border-radius: .5rem; overflow-x: auto; font-size: .9rem; }
 #entrar input { font: inherit; padding: .5rem; border: 1px solid var(--linha); border-radius: .4rem; background: var(--fundo); color: var(--tinta); }
+.recentes { padding-left: 1.1rem; font-size: .9rem; } .recentes span { color: var(--suave); }
