@@ -3,8 +3,32 @@
   "name": "io.github.projects-betanull/painel-emendas",
   "title": "Emendas parlamentares do Brasil",
   "description": "Brazilian federal budget amendments by municipality, author and recipient. Paid via Lightning.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "websiteUrl": "https://painel-emendas.pages.dev/ia/",
-  "repository": { "url": "https://github.com/projects-betanull/painel-emendas", "source": "github" },
-  "remotes": [{ "type": "streamable-http", "url": "https://painel-emendas.pages.dev/mcp" }]
+  "repository": {
+    "url": "https://github.com/projects-betanull/painel-emendas",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://painel-emendas.pages.dev/mcp"
+    }
+  ],
+  "icons": [
+    {
+      "src": "https://painel-emendas.pages.dev/icone.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    },
+    {
+      "src": "https://painel-emendas.pages.dev/icone.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    }
+  ]
 }
