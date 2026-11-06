@@ -26,4 +26,5 @@ CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_KEY. TOKEN_SECRET é derivado
 ## Próximos passos em aberto
 - Compra de teste real do passe MCP (pagar 1000 sats e chamar ativar_acesso).
 - Cadastro em diretórios de MCP com formulário (Smithery, mcp.so, Glama) e divulgação.
-- Emendas 2002–2013 (Siga Brasil) e cruzamento com licitações (PNCP): adiados.
+- PNCP feito: /api/contratos (lib/pncp.js) e ferramenta contratos_prefeitura.
+- Apoiadores (portaldatransparencia.gov.br/emendas/adpf854, página em JavaScript) e emendas 2002–2013: pendentes.

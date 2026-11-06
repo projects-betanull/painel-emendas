@@ -83,6 +83,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 {og_url}
+<link rel="icon" href="{raiz}icone.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{raiz}estilo.css">
 </head>
 <body>
