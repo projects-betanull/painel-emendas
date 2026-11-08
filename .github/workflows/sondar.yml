@@ -4,17 +4,17 @@ jobs:
   sondar:
     runs-on: ubuntu-latest
     steps:
-      - name: PNCP tempos
+      - name: PNCP nacional
         run: |
+          D=$(date -d '-3 days' +%Y%m%d); M1=$(date -d '-40 days' +%Y%m%d); M2=$(date -d '-10 days' +%Y%m%d)
+          B="https://pncp.gov.br/api/consulta/v1/contratos"
+          curl -s -o d.json -w "1 dia HTTP %{http_code} %{time_total}s " --max-time 150 "$B?dataInicial=$D&dataFinal=$D&pagina=1&tamanhoPagina=500"; jq -c '{totalRegistros,totalPaginas}' d.json
+          jq -c '.data[0] | {dataPublicacaoPncp,dataAssinatura,dataAtualizacao, orgao:.orgaoEntidade.cnpj, esfera:.orgaoEntidade.esferaId, mun:.unidadeOrgao.codigoIbge}' d.json
+          jq -r '[.data[].orgaoEntidade.esferaId]|group_by(.)|map("\(.[0]):\(length)")|join(" ")' d.json
+          for p in 2 3; do curl -s -o /dev/null -w "pag $p %{time_total}s\n" "$B?dataInicial=$D&dataFinal=$D&pagina=$p&tamanhoPagina=500"; done
+          curl -s -o m.json -w "30 dias HTTP %{http_code} %{time_total}s " --max-time 150 "$B?dataInicial=$M1&dataFinal=$M2&pagina=1&tamanhoPagina=500"; jq -c '{totalRegistros,totalPaginas}' m.json
+          curl -s -o /dev/null -w "30 dias pag 40 %{time_total}s\n" "$B?dataInicial=$M1&dataFinal=$M2&pagina=40&tamanhoPagina=500"
+          echo "== BH paginas 2..7 em paralelo"
           D1=$(date -d '-364 days' +%Y%m%d); D2=$(date +%Y%m%d)
-          B="https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=$D1&dataFinal=$D2"
-          for c in 51885242000140 46395000000139 13927801000149 18715383000140; do
-            for t in 50 500; do
-              curl -s -o p.json -w "$c tam=$t HTTP %{http_code} %{time_total}s %{size_download}B " --max-time 120 "$B&cnpjOrgao=$c&pagina=1&tamanhoPagina=$t"
-              jq -c '{totalRegistros,totalPaginas}' p.json 2>/dev/null || echo
-            done
-          done
-          echo "== pagina 2 e 3 SP em paralelo"
-          time (curl -s -o /dev/null -w "p2 %{time_total}\n" "$B&cnpjOrgao=46395000000139&pagina=2&tamanhoPagina=500" & curl -s -o /dev/null -w "p3 %{time_total}\n" "$B&cnpjOrgao=46395000000139&pagina=3&tamanhoPagina=500" & wait)
-          echo "== site no ar"
-          for c in 46395000000139 13927801000149; do curl -s -o s.json -w "site $c HTTP %{http_code} %{time_total}s\n" --max-time 150 "https://painel-emendas.pages.dev/api/contratos?cnpj=$c"; head -c 200 s.json; echo; done
+          time (for p in 2 3 4 5 6 7; do curl -s -o /dev/null -w "p$p %{http_code} %{time_total}\n" "$B?dataInicial=$D1&dataFinal=$D2&cnpjOrgao=18715383000140&pagina=$p&tamanhoPagina=500" & done; wait)
+          echo "== site BH"; curl -s -o s.json -w "site HTTP %{http_code} %{time_total}s\n" --max-time 150 "https://painel-emendas.pages.dev/api/contratos?cnpj=18715383000140"; head -c 150 s.json; echo
