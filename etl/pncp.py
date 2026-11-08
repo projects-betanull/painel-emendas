@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -26,7 +27,7 @@ from . import config
 
 API = "https://pncp.gov.br/api/consulta/v1"
 TAM = 500
-TRABALHADORES = 8
+TRABALHADORES = 4
 JANELA_DIAS = 364
 ARQUIVO = config.ROOT / "data" / "pncp" / "contratos.parquet"
 COLUNAS = ["id", "orgao", "ano", "seq", "ni", "fornecedor", "tipo_pessoa", "valor", "data_assinatura", "data_publicacao", "objeto"]
@@ -41,9 +42,26 @@ def _dia(d: date) -> str:
     return d.strftime("%Y%m%d")
 
 
+_pausa = {"ate": 0.0}
+_trava = threading.Lock()
+
+
+def _esperar_pausa() -> None:
+    while (resta := _pausa["ate"] - time.time()) > 0:
+        time.sleep(resta)
+
+
+def _pausar(segundos: float) -> None:
+    """HTTP 429 vale para todas as threads: ninguém pede nada até a pausa acabar."""
+    with _trava:
+        _pausa["ate"] = max(_pausa["ate"], time.time() + segundos)
+
+
 def _pagina(caminho: str, d1: date, d2: date, p: int) -> dict:
     url = f"{API}/{caminho}?dataInicial={_dia(d1)}&dataFinal={_dia(d2)}&pagina={p}&tamanhoPagina={TAM}"
-    for tentativa in range(6):
+    erro = ""
+    for tentativa in range(12):
+        _esperar_pausa()
         try:
             r = _sessao.get(url, timeout=120)
             if r.status_code == 204:
@@ -51,6 +69,10 @@ def _pagina(caminho: str, d1: date, d2: date, p: int) -> dict:
             if r.status_code == 200:
                 return r.json()
             erro = f"HTTP {r.status_code}"
+            if r.status_code == 429:
+                espera = r.headers.get("retry-after", "")
+                _pausar(float(espera) if espera.isdigit() else min(15 * 2 ** tentativa, 300))
+                continue
         except (requests.RequestException, ValueError) as e:
             erro = str(e)[:120]
         time.sleep(min(5 * 2 ** tentativa, 120))
