@@ -3,7 +3,7 @@
   "name": "io.github.projects-betanull/painel-emendas",
   "title": "Emendas parlamentares do Brasil",
   "description": "Brazilian federal budget amendments by municipality, author and recipient. Paid via Lightning.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "websiteUrl": "https://painel-emendas.pages.dev/ia/",
   "repository": {
     "url": "https://github.com/projects-betanull/painel-emendas",

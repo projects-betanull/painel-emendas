@@ -12,6 +12,7 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `functions/api/gestao.js`: dados da página /gestao/, exige cabeçalho X-Admin-Key = ADMIN_KEY.
 - `functions/api/_middleware.js`: bloqueia acesso direto a /api/m e /api/ranking (só o MCP lê, via env.ASSETS).
 - `server.json` + `.github/workflows/mcp-registry.yml`: publicação no registro oficial de MCP (OIDC). Suba a versão em server.json a cada mudança relevante do MCP.
+- `.github/workflows/pncp.yml` + `etl/pncp.py`: todo dia 05:41 mantém os contratos municipais do PNCP dos últimos 12 meses (`contratos.parquet` na release `pncp-dados`; consulta nacional por data, que é rápida; filtrar por órgão leva 15–40 s). Pessoa física guardada só como contagem. O ETL baixa esse arquivo e põe os contratos prontos na página do município e em /api/m (MCP). Sem a base completa, cai para `/api/contratos` (lib/pncp.js) pelo navegador.
 - `.github/workflows/verificar.yml`: após cada ETL, testa site, MCP, bloqueios e fatura Lightning no ar.
 
 ## Segredos (GitHub → Settings → Secrets → Actions)
@@ -26,5 +27,5 @@ CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_KEY. TOKEN_SECRET é derivado
 ## Próximos passos em aberto
 - Compra de teste real do passe MCP (pagar 1000 sats e chamar ativar_acesso).
 - Cadastro em diretórios de MCP com formulário (Smithery, mcp.so, Glama) e divulgação.
-- PNCP feito: /api/contratos (lib/pncp.js) e ferramenta contratos_prefeitura.
+- PNCP feito: base diária (pncp.yml), /api/contratos como reserva e ferramenta contratos_prefeitura.
 - Apoiadores (portaldatransparencia.gov.br/emendas/adpf854, página em JavaScript) e emendas 2002–2013: pendentes.

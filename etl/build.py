@@ -107,6 +107,31 @@ def gravar(tabelas: dict[str, pd.DataFrame], destino: Path) -> list[Path]:
     return arquivos
 
 
+def carregar_contratos(fav: pd.DataFrame, arquivo: Path | None = None) -> dict | None:
+    """Resumos do PNCP por CNPJ de prefeitura, se a base de etl/pncp.py estiver completa e em dia."""
+    from datetime import date, timedelta
+
+    from .pncp import ARQUIVO, ler, resumos
+    from .site import cnpj_prefeitura
+
+    arquivo = arquivo or ARQUIVO
+    if not arquivo.exists():
+        print("PNCP: base não encontrada; páginas buscam contratos pelo navegador")
+        return None
+    df = ler(arquivo)
+    hoje = date.today()
+    if df.empty or df["data_publicacao"].min() > (hoje - timedelta(days=350)).isoformat() \
+            or df["data_publicacao"].max() < (hoje - timedelta(days=5)).isoformat():
+        print("PNCP: base incompleta ou atrasada; páginas buscam contratos pelo navegador")
+        return None
+    docs = fav[fav["municipio_ibge"].notna()].groupby(["municipio_ibge", "favorecido", "codigo_favorecido"])["valor_recebido"].sum()
+    cnpjs = {c for c in (cnpj_prefeitura(g.droplevel(0).sort_values(ascending=False)) for _, g in docs.groupby(level=0)) if c}
+    quando = date.fromisoformat(str(df["data_publicacao"].max())).strftime("%d/%m/%Y")
+    r = resumos(df, cnpjs, atualizado_em=quando)
+    print(f"PNCP: {len(df):,} contratos municipais; {len(r):,} de {len(cnpjs):,} prefeituras com contrato")
+    return r
+
+
 def main(argv=None) -> dict:
     p = argparse.ArgumentParser()
     p.add_argument("--sem-baixar", action="store_true", help="usar arquivos já existentes em data/raw")
@@ -151,7 +176,8 @@ def main(argv=None) -> dict:
 
         arq_pop = args.raw / "populacao.json"
         populacao = json.loads(arq_pop.read_text(encoding="utf-8")) if arq_pop.exists() else None
-        paginas = gerar_site(fav, municipios, args.site, fato=fato, populacao=populacao)
+        contratos = carregar_contratos(fav)
+        paginas = gerar_site(fav, municipios, args.site, fato=fato, populacao=populacao, contratos=contratos)
         print(f"site: {paginas:,} páginas de município -> {args.site}")
         from .cubo import gravar_cubo, gravar_cubos_por_uf, montar_cubo
 
@@ -159,7 +185,7 @@ def main(argv=None) -> dict:
         gravar_cubos_por_uf(fav, fato, municipios, args.site / "explorar")
         from .site import gerar_api
 
-        gerar_api(args.site, fav, municipios, populacao, fato, qualidade)
+        gerar_api(args.site, fav, municipios, populacao, fato, qualidade, contratos=contratos)
         if not args.sem_baixar:
             from .bancadas import gravar_bancadas
 

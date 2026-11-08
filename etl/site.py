@@ -135,6 +135,39 @@ def cnpj_prefeitura(favs: pd.Series) -> str:
     return ""
 
 
+def secao_contratos(cnpj: str, contratos: dict | None) -> str:
+    """Contratos da prefeitura no PNCP. Com a base pré-calculada (etl/pncp.py) a seção sai pronta;
+    sem ela, a página busca em /api/contratos pelo navegador (lento)."""
+    titulo = ('<h2>Empresas contratadas pela prefeitura</h2>\n<p class="dica">Contratos dos últimos 12 meses publicados no '
+              '<a href="https://pncp.gov.br/">PNCP</a>. Os dados públicos não indicam quais foram pagos com dinheiro de emendas.</p>')
+    if contratos is None:
+        return (f'<section id="contratos" data-cnpj="{e(cnpj)}" hidden>{titulo}\n<div class="conteudo">Carregando…</div></section>\n'
+                '<script src="../../contratos.js" defer></script>')
+    if not cnpj:
+        return ""
+    from .pncp import vazio
+
+    d = contratos.get(cnpj) or vazio(cnpj)
+    quando = ""
+    if d.get("atualizado_em"):
+        quando = f'<p class="dica">Consulta ao PNCP em {e(d["atualizado_em"])}.</p>'
+    if not d["total_contratos"]:
+        corpo = ("<p>Nenhum contrato publicado no PNCP nos últimos 12 meses. "
+                 "Municípios de até 20 mil habitantes ainda estão no prazo de adesão.</p>")
+    else:
+        linhas = "".join(f'<tr><td>{e(f["fornecedor"])}</td><td>{e(f["cnpj"])}</td><td class="n">{f["contratos"]}</td>'
+                         f'<td class="n">{brl(f["valor"])}</td></tr>' for f in d["fornecedores"])
+        recentes = "".join(f'<li>{e(c["data"])} · {e(c["fornecedor"])} · {brl(c["valor"])}<br><span>{e(c["objeto"])}</span>'
+                           + (f' <a href="{e(c["link"])}">ver no PNCP</a>' if c.get("link") else "") + "</li>" for c in d["recentes"])
+        corpo = (f'<p><strong>{d["total_contratos"]:,} contratos</strong>'.replace(",", ".") + f' somando <strong>{brl(d["valor_total"])}</strong>.</p>'
+                 '<div class="tabela"><table><thead><tr><th>Fornecedor</th><th>CNPJ</th><th class="n">Contratos</th><th class="n">Valor</th></tr></thead>'
+                 f'<tbody>{linhas}</tbody></table></div>'
+                 f'<details><summary>Contratos mais recentes</summary><ul class="recentes">{recentes}</ul></details>')
+        if d["omitidos_pessoa_fisica"]:
+            corpo += f'<p class="dica">{d["omitidos_pessoa_fisica"]} contrato(s) com pessoa física omitido(s).</p>'
+    return f'<section id="contratos">{titulo}\n<div class="conteudo">{corpo}{quando}</div></section>'
+
+
 def glossario(termo: str, texto: str, raiz: str) -> str:
     return f'<a class="glos" href="{raiz}sobre/#{termo}" title="{e(texto)}">?</a>'
 
@@ -143,7 +176,7 @@ def glossario(termo: str, texto: str, raiz: str) -> str:
 
 
 def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: pd.DataFrame | None = None,
-               populacao: dict | None = None) -> int:
+               populacao: dict | None = None, contratos: dict | None = None) -> int:
     """Gera o site em `destino`. Devolve o número de páginas de município."""
     if destino.exists():
         shutil.rmtree(destino)
@@ -231,10 +264,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 <section><h2>Quem recebeu {glossario("favorecido", "Quem recebeu o dinheiro direto da União: prefeitura, fundo, entidade.", "../../")}</h2>
 {tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
 <p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a></p></section>
-<section id="contratos" data-cnpj="{e(cnpj_prefeitura(top_fav_todos))}" hidden><h2>Empresas contratadas pela prefeitura</h2>
-<p class="dica">Contratos dos últimos 12 meses publicados no <a href="https://pncp.gov.br/">PNCP</a>. Os dados públicos não indicam quais foram pagos com dinheiro de emendas.</p>
-<div class="conteudo">Carregando…</div></section>
-<script src="../../contratos.js" defer></script>
+{secao_contratos(cnpj_prefeitura(top_fav_todos), contratos)}
 <section><h2>Tipo de emenda {glossario("tipo", "Individual, de bancada, de comissão ou de relator; transferências especiais são as Emendas Pix.", "../../")}</h2>
 {tabela(["Tipo", "Valor", "%"], [[e(t), brl(v), pct(100 * v / total)] for t, v in top_tipo.items()], {1, 2})}</section>
 <aside class="origem"><strong>De onde vêm estes números:</strong> soma do campo "Valor Recebido" do arquivo de favorecidos do
@@ -401,7 +431,7 @@ document.getElementById("copiar").addEventListener("click", async (ev) => {{
 
 
 def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populacao: dict | None, fato: pd.DataFrame | None,
-              qualidade: dict | None = None) -> None:
+              qualidade: dict | None = None, contratos: dict | None = None) -> None:
     """Arquivos JSON pequenos lidos pelo servidor MCP (um por município + rankings)."""
     api = destino / "api"
     (api / "m").mkdir(parents=True, exist_ok=True)
@@ -438,6 +468,10 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
             "cnpj_prefeitura": cnpj_prefeitura(parte.groupby(["favorecido", "doc"])["valor_recebido"].sum().sort_values(ascending=False)) or None,
             "pagina": f"{config.SITE_URL}/{caminho_municipio(*nomes[cod])}", **fonte,
         }
+        if contratos is not None and info["cnpj_prefeitura"]:
+            from .pncp import vazio
+
+            info["contratos"] = contratos.get(info["cnpj_prefeitura"]) or vazio(info["cnpj_prefeitura"])
         (api / "m" / f"{cod}.json").write_text(json.dumps(info, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         linhas.append({"codigo_ibge": cod, "municipio": nomes[cod][0], "uf": nomes[cod][1], "total": round(total, 2),
                        "por_habitante": info["por_habitante"], "populacao": p})

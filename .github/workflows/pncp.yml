@@ -1,0 +1,50 @@
+name: Contratos do PNCP
+
+# Mantém os contratos municipais do PNCP dos últimos 12 meses num Parquet guardado como
+# arquivo da release "pncp-dados". Na primeira vez baixa os 12 meses (cerca de 1 h);
+# depois só o que foi publicado ou atualizado desde a véspera. Roda antes do ETL diário,
+# que lê esse arquivo e põe os contratos direto na página de cada município.
+on:
+  schedule:
+    - cron: "41 8 * * *" # 05:41 em Brasília
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pncp
+  cancel-in-progress: false
+
+jobs:
+  pncp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Baixar a base guardada
+        run: |
+          gh release view pncp-dados >/dev/null 2>&1 || gh release create pncp-dados --title "Base de contratos do PNCP" \
+            --notes "Contratos municipais dos últimos 12 meses (PNCP), atualizados todo dia pelo workflow pncp.yml. Uso interno do ETL." --latest=false
+          gh release download pncp-dados -p contratos.parquet -D data/pncp || echo "sem base ainda: carga inicial"
+
+      - name: Atualizar
+        run: python -m etl.pncp atualizar
+
+      - name: Guardar a base
+        # Guarda mesmo se a carga parar no meio: a próxima execução continua de onde parou.
+        if: ${{ always() && hashFiles('data/pncp/contratos.parquet') != '' }}
+        run: |
+          ls -la data/pncp/
+          gh release upload pncp-dados data/pncp/contratos.parquet --clobber

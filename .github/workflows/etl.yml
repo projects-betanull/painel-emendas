@@ -34,6 +34,11 @@ jobs:
       - name: Testes
         run: python -m pytest -q
 
+      - name: Base de contratos do PNCP (feita pelo workflow pncp.yml)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download pncp-dados -p contratos.parquet -D data/pncp || echo "sem base do PNCP; páginas buscam pelo navegador"
+
       - name: Rodar ETL
         run: python -m etl.build
 

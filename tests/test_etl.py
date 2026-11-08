@@ -191,3 +191,51 @@ def test_mcp(tmp_path):
     raiz = Path(__file__).parent.parent
     r = subprocess.run(["node", str(raiz / "tests" / "test_mcp.mjs"), str(site)], capture_output=True, text=True)
     assert r.returncode == 0 and "mcp ok" in r.stdout, r.stdout + r.stderr
+
+
+def _contrato(orgao, seq, ni, valor, pub, esfera="M", tipo="PJ", ass=None):
+    return {"numeroControlePNCP": f"{orgao}-{seq}", "orgaoEntidade": {"cnpj": orgao, "esferaId": esfera}, "anoContrato": 2026,
+            "sequencialContrato": seq, "niFornecedor": ni, "nomeRazaoSocialFornecedor": f"FORN {ni}", "tipoPessoa": tipo,
+            "valorGlobal": valor, "dataAssinatura": ass or pub, "dataPublicacaoPncp": pub + "T10:00:00", "objetoContrato": "obra " * 100}
+
+
+def test_pncp_base_e_resumo():
+    from datetime import date
+
+    from etl import pncp
+
+    hoje = date(2026, 11, 8)
+    brutos = [_contrato("46068425000133", 1, "11222333000181", 100, "2026-10-01"),
+              _contrato("46068425000133", 2, "11222333000181", 50, "2026-11-01"),
+              _contrato("46068425000133", 3, "12345678901", 9, "2026-11-02", tipo="PF"),
+              _contrato("46068425000133", 4, "99888777000166", 80, "2025-10-01"),   # mais de 12 meses
+              _contrato("00394460000141", 5, "11222333000181", 70, "2026-11-01", esfera="F")]  # federal
+    linhas = [x for x in map(pncp.compactar, brutos) if x]
+    assert len(linhas) == 4 and len(linhas[0]["objeto"]) == 240
+    df = pncp.juntar(pncp.pd.DataFrame(columns=pncp.COLUNAS), linhas, hoje)
+    assert len(df) == 3
+    # atualização do contrato 1 substitui a linha antiga
+    df = pncp.juntar(df, [pncp.compactar(_contrato("46068425000133", 1, "11222333000181", 120, "2026-10-01"))], hoje)
+    r = pncp.resumos(df, {"46068425000133"}, "08/11/2026")["46068425000133"]
+    assert r["total_contratos"] == 2 and r["valor_total"] == 170 and r["omitidos_pessoa_fisica"] == 1
+    assert r["fornecedores"][0] == {"fornecedor": "FORN 11222333000181", "cnpj": "11222333000181", "valor": 170, "contratos": 2}
+    assert r["recentes"][0]["data"] == "2026-11-01" and r["recentes"][0]["link"].endswith("/46068425000133/2026/2")
+
+
+def test_site_com_contratos_prontos(tmp_path, monkeypatch):
+    from datetime import date, timedelta
+
+    from etl import pncp
+
+    hoje = date.today()
+    linhas = [pncp.compactar(_contrato("46068425000133", i, "11222333000181", 1000 * i, (hoje - timedelta(days=d)).isoformat()))
+              for i, d in [(1, 360), (2, 1)]]
+    arq = tmp_path / "pncp" / "contratos.parquet"
+    pncp.gravar(pncp.pd.DataFrame(linhas, columns=pncp.COLUNAS), arq)
+    monkeypatch.setattr(pncp, "ARQUIVO", arq)
+    site = tmp_path / "site"
+    build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site)])
+    campinas = (site / "municipio" / "campinas-sp" / "index.html").read_text(encoding="utf-8")
+    assert "FORN 11222333000181" in campinas and "R$ 3.000" in campinas and "contratos.js" not in campinas
+    api = json.loads((site / "api" / "m" / "3509502.json").read_text(encoding="utf-8"))
+    assert api["contratos"]["total_contratos"] == 2
