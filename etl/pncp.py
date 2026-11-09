@@ -171,7 +171,9 @@ def atualizar(arquivo: Path = ARQUIVO, hoje: date | None = None) -> pd.DataFrame
             ini_j, n = fim + timedelta(days=1), n + 1
             if n % 4 == 0:
                 gravar(df, arquivo)
-        if not base.empty:  # contratos antigos que mudaram (aditivos, correções)
+        # Contratos antigos que mudaram (aditivos, correções). Só na rotina diária: numa retomada
+        # de carga, o período inteiro já veio novo e baixar as atualizações dobraria o tempo.
+        if not base.empty and (hoje - ini).days <= 14:
             try:
                 df = juntar(df, baixar_periodo("contratos/atualizacao", ini, hoje), hoje)
             except RuntimeError as e:
