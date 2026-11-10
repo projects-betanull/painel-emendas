@@ -15,7 +15,7 @@ function filtrosParaSets(cubo, f) {
   return s;
 }
 
-function pivotar(cubo, est) {
+function pivotar(cubo, est, limite = LIMITE) {
   const sets = filtrosParaSets(cubo, est.f), dimsF = Object.keys(sets);
   const L = cubo.cols[est.lin], C = est.col ? cubo.cols[est.col] : null, M = cubo[est.med];
   const linhas = new Map(), totCol = new Map();
@@ -36,7 +36,7 @@ function pivotar(cubo, est) {
     cols = est.col === "ano" ? cols.sort((a, b) => rot[a].localeCompare(rot[b])) : cols.sort((a, b) => totCol.get(b) - totCol.get(a)).slice(0, MAX_COLS);
   }
   const ordenadas = [...linhas.entries()].sort((a, b) => b[1].total - a[1].total);
-  return { total, nLinhas: ordenadas.length, cols, linhas: ordenadas.slice(0, LIMITE) };
+  return { total, nLinhas: ordenadas.length, cols, linhas: ordenadas.slice(0, limite) };
 }
 
 function descer(est, rotulo, dims = Object.keys(NOMES)) {

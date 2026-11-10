@@ -14,6 +14,24 @@ if (typeof document !== "undefined") (async function () {
   let cubo = null, est = deHash(location.hash.slice(1));
   const dimsDe = (c) => Object.keys(NOMES).filter((d) => c.dims[d]);
 
+  let ultimo = null;
+  function baixarCsv() {
+    const { r, rotL, rotC } = ultimo;
+    const q = (x) => '"' + String(x).replace(/"/g, '""') + '"';
+    const cab = [NOMES[est.lin], ...(rotC ? r.cols.map((c) => rotC[c]) : []), "Total"];
+    const linhas = r.linhas.map(([l, x]) => [rotL[l], ...(rotC ? r.cols.map((c) => Math.round(x.cols.get(c) || 0)) : []), Math.round(x.total)]);
+    const csv = "\ufeff" + [cab, ...linhas].map((l) => l.map(q).join(";")).join("\r\n")
+      + "\r\n\r\n" + q("Fonte: Portal da Transparência (CGU). Valores reproduzidos como publicados. painel-emendas.pages.dev/explorar/#" + paraHash(est));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `emendas-${est.lin}${est.col ? "-" + est.col : ""}.csv`;
+    a.click();
+  }
+  $("mais").addEventListener("click", (ev) => {
+    if (ev.target.id !== "csv") return;
+    Passe.exigir(() => { desenhar(); baixarCsv(); });
+  });
+
   function montarControles() {
     for (const [id, vazio] of [["linhas", false], ["colunas", true]]) {
       $(id).innerHTML = (vazio ? '<option value="">(nenhuma)</option>' : "") + dimsDe(cubo).map((d) => `<option value="${d}">${NOMES[d]}</option>`).join("");
@@ -51,12 +69,15 @@ if (typeof document !== "undefined") (async function () {
       .map(([d, v]) => `<button type="button" class="chip" data-subir="${d}" title="Remover filtro (drill-up)">${NOMES[d]}: ${esc(v.length > 2 ? v.length + " selecionados" : v.join(", "))} ✕</button>`);
     $("trilha").innerHTML = '<button type="button" class="chip raiz" data-subir="*">Brasil</button>' + chips.join("");
 
-    const r = pivotar(cubo, est), rotL = cubo.dims[est.lin], rotC = est.col ? cubo.dims[est.col] : null;
+    const pago = window.Passe && Passe.valido(), r = pivotar(cubo, est, pago ? Infinity : LIMITE), rotL = cubo.dims[est.lin], rotC = est.col ? cubo.dims[est.col] : null;
     $("resumo").innerHTML = `<strong>${fmt(r.total, est.med)}</strong> em ${r.nLinhas.toLocaleString("pt-BR")} ${r.nLinhas === 1 ? UM[est.lin] : VARIOS[est.lin]}`;
     const cab = `<thead><tr><th>${NOMES[est.lin]}</th>${rotC ? r.cols.map((c) => `<th class="n">${esc(rotC[c])}</th>`).join("") : ""}<th class="n">Total</th></tr></thead>`;
     const corpo = r.linhas.map(([l, x]) => `<tr><td><a href="#" data-descer="${esc(rotL[l])}">${esc(rotL[l])}</a></td>${rotC ? r.cols.map((c) => `<td class="n">${x.cols.has(c) ? fmt(x.cols.get(c), est.med) : "–"}</td>`).join("") : ""}<td class="n"><strong>${fmt(x.total, est.med)}</strong></td></tr>`).join("");
     $("pivo").innerHTML = cab + "<tbody>" + corpo + "</tbody>";
-    $("mais").textContent = r.nLinhas > LIMITE ? `Mostrando as ${LIMITE} maiores de ${r.nLinhas.toLocaleString("pt-BR")}. Use os filtros para refinar. Tabela completa e exportação em CSV: em breve.` : "";
+    ultimo = { r, rotL, rotC };
+    $("mais").innerHTML = (pago ? `<span class="pago">Passe ativo até ${Passe.validade().toLocaleString("pt-BR")}</span> ` : "")
+      + (!pago && r.nLinhas > LIMITE ? `Mostrando as ${LIMITE} maiores de ${r.nLinhas.toLocaleString("pt-BR")}. ` : "")
+      + `<button type="button" class="botao2" id="csv">${pago ? "Baixar CSV" : (r.nLinhas > LIMITE ? "Ver tudo e baixar CSV ⚡" : "Baixar CSV ⚡")}</button>`;
   }
 
   document.addEventListener("click", (ev) => {

@@ -125,3 +125,17 @@ th { font-size: .75rem; }
 .codigo { background: var(--acento-claro); padding: .75rem 1rem; border-radius: .5rem; overflow-x: auto; font-size: .9rem; }
 #entrar input { font: inherit; padding: .5rem; border: 1px solid var(--linha); border-radius: .4rem; background: var(--fundo); color: var(--tinta); }
 .recentes { padding-left: 1.1rem; font-size: .9rem; } .recentes span { color: var(--suave); }
+.passe-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+.passe { background: var(--fundo); color: var(--tinta); border-radius: .9rem; padding: 1.25rem 1.25rem 1rem; max-width: 24rem; width: 100%; max-height: 92vh; overflow: auto; position: relative; text-align: center; }
+.passe-x { position: absolute; right: .5rem; top: .5rem; background: transparent; color: var(--suave); border: 0; font-size: 1.2rem; min-width: 2.75rem; min-height: 2.75rem; }
+.passe-qr { display: inline-block; background: #fff; padding: .4rem; border-radius: .6rem; }
+.passe-qr svg { width: min(240px, 65vw); height: auto; display: block; }
+.passe details { text-align: left; margin-top: .75rem; font-size: .9rem; }
+.passe-tk { width: 100%; font: inherit; padding: .5rem; margin: .4rem 0; border: 1px solid var(--linha); border-radius: .4rem; background: var(--fundo); color: var(--tinta); }
+.pago { font-size: .85rem; color: var(--acento); font-weight: 600; }
+@media print {
+  .topo, footer, .acoes, .apoio, .passe-fundo, .glos, #contratos details, .dica a { display: none !important; }
+  body { background: #fff; color: #000; } main { max-width: none; padding: 0; }
+  .origem { color: #000; }
+}
+button.botao2 { background: transparent; color: var(--acento); font: inherit; font-weight: 600; cursor: pointer; }

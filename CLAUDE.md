@@ -1,6 +1,6 @@
 # Painel de Emendas — contexto para o Claude Code
 
-Site público (https://painel-emendas.pages.dev) que mostra quanto cada município recebeu em emendas parlamentares federais, de quem e para quem. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança só no MCP, via Lightning (lizard43@coinos.io).
+Site público (https://painel-emendas.pages.dev) que mostra quanto cada município recebeu em emendas parlamentares federais, de quem e para quem. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança via Lightning (lizard43@coinos.io): no MCP e no site (passe de 24 h: tabela completa e CSV no Explorar, relatório em PDF do município).
 
 ## Como funciona
 - `.github/workflows/etl.yml` roda todo dia 06:17 (Brasília): baixa os dados, testa, gera `site/` e publica no Cloudflare Pages (com `functions/`).
@@ -9,6 +9,7 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `etl/build.py`: orquestra; `etl/site.py`: páginas estáticas, Sobre (fontes, base legal, LGPD), Apoie, JSON da API e sitemap/llms.txt; `etl/cubo.py`: cubo do Explorar (+ um por UF com favorecidos); `etl/bancadas.py`: membros das bancadas (Câmara e Senado).
 - `etl/site_static/`: CSS, `motor.js` (pivô compartilhado), `explorar/`, `painel/`, `gestao/`, `ia/`.
 - `lib/mcp.js` + `functions/mcp.js`: servidor MCP (Streamable HTTP) em /mcp. Grátis: buscar_municipio, resumo_municipio. Pago (passe 24 h, 1000 sats): detalhes e ranking. Fatura via LNURL do endereço Lightning; conferência pela API pública de faturas do coinos; token HMAC com TOKEN_SECRET.
+- `functions/api/passe.js` + `etl/site_static/passe.js`: compra do passe no navegador (fatura, QR via qrcode.js baixado do unpkg no build, conferência a cada 3 s, token no localStorage; o token do MCP também vale).
 - `functions/api/gestao.js`: dados da página /gestao/, exige cabeçalho X-Admin-Key = ADMIN_KEY.
 - `functions/api/_middleware.js`: bloqueia acesso direto a /api/m e /api/ranking (só o MCP lê, via env.ASSETS).
 - `server.json` + `.github/workflows/mcp-registry.yml`: publicação no registro oficial de MCP (OIDC). Suba a versão em server.json a cada mudança relevante do MCP.

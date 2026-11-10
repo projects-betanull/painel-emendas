@@ -23,6 +23,8 @@ jobs:
           rpc '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resumo_municipio","arguments":{"codigo_ibge":"3509502"}}}' | jq -r '.result.content[0].text' | head -c 400; echo
           echo "--- contratos PNCP (Campinas)"; curl -s "$B/api/contratos?cnpj=51885242000140" | jq -c '{total_contratos, valor_total, omitidos_pessoa_fisica, top: .fornecedores[0], erro, detalhe}'
           echo "contratos prontos na página de Campinas (esperado 1 e 0): $(curl -s $B/municipio/campinas-sp/ | grep -c '<section id="contratos">') $(curl -s $B/municipio/campinas-sp/ | grep -c 'contratos.js')"
+          echo "passe pelo site (esperado fatura): $(curl -s -X POST $B/api/passe | head -c 60)"
+          echo "qrcode.js: $(curl -s -o /dev/null -w '%{http_code}' $B/qrcode.js)"
           echo "api/m direto (esperado 403): $(curl -s -o /dev/null -w '%{http_code}' $B/api/m/3509502.json)"
           echo "gestao com chave (esperado 200 e assinatura true): $(curl -s -H "x-admin-key: $ADMIN_KEY" $B/api/gestao)"
           echo "gestao sem chave (esperado 401): $(curl -s -o /dev/null -w '%{http_code}' $B/api/gestao)"

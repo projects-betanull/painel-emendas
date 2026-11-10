@@ -126,6 +126,18 @@ def barras_ano(por_ano: pd.Series) -> str:
     return f'<div class="barras">{itens}</div>'
 
 
+def baixar_qrcode(destino: Path) -> None:
+    """Gerador de QR code em JS (qrcode-generator, MIT) para as faturas Lightning do passe."""
+    try:
+        import requests
+
+        r = requests.get("https://unpkg.com/qrcode-generator@1.4.4/qrcode.js", timeout=15)
+        r.raise_for_status()
+        (destino / "qrcode.js").write_text(r.text, encoding="utf-8")
+    except Exception as erro:  # sem QR, o passe mostra a fatura para copiar
+        print(f"aviso: qrcode.js indisponível ({type(erro).__name__})")
+
+
 def cnpj_prefeitura(favs: pd.Series) -> str:
     """CNPJ da prefeitura entre os favorecidos: 'MUNICIPIO DE …' ou 'PREFEITURA …' com CNPJ válido."""
     for (nome, doc), _ in favs.items():
@@ -189,6 +201,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 
     atualizado = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y")
     desde = str(int(fav["ano"].min()))
+    baixar_qrcode(destino)
     nomes = {str(m["codigo_ibge"]): (m["nome"], m["uf"]) for m in municipios}
     pop = {str(k): int(v) for k, v in (populacao or {}).get("pop", {}).items()}
     fonte_pop = (populacao or {}).get("fonte", "")
@@ -257,7 +270,8 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 <p class="contexto">{int(b['rank_uf'])}º de {int(qtd_uf[uf])} municípios de {e(uf)} em valor recebido{hab}</p>
 <p class="resumo-texto">{' '.join(resumo)}</p>
 <p class="acoes"><a class="botao-wpp" href="https://wa.me/?text={quote(texto_wpp)}" rel="noopener">Compartilhar no WhatsApp</a>
-<a class="botao2" href="../../painel/#f.municipio={quote(rotulo_m)}">Ver no painel</a></p>
+<a class="botao2" href="../../painel/#f.municipio={quote(rotulo_m)}">Ver no painel</a>
+<button type="button" class="botao2" id="pdf">Relatório em PDF ⚡</button></p>
 <section><h2>Por ano</h2>{barras_ano(por_ano.loc[codigo])}</section>
 <section><h2>Quem mandou o dinheiro {glossario("autor", "Parlamentar, bancada estadual ou comissão autora da emenda.", "../../")}</h2>
 {tabela(["Autor da emenda", "Valor"], [[e(a), brl(v)] for a, v in top_aut.items()], {1})}</section>
@@ -265,6 +279,8 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 {tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
 <p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a></p></section>
 {secao_contratos(cnpj_prefeitura(top_fav_todos), contratos)}
+<script src="../../qrcode.js"></script><script src="../../passe.js"></script>
+<script>document.getElementById("pdf").onclick=()=>Passe.exigir(()=>{{document.querySelectorAll("#contratos details").forEach(d=>d.open=true);window.print();}});</script>
 <section><h2>Tipo de emenda {glossario("tipo", "Individual, de bancada, de comissão ou de relator; transferências especiais são as Emendas Pix.", "../../")}</h2>
 {tabela(["Tipo", "Valor", "%"], [[e(t), brl(v), pct(100 * v / total)] for t, v in top_tipo.items()], {1, 2})}</section>
 <aside class="origem"><strong>De onde vêm estes números:</strong> soma do campo "Valor Recebido" do arquivo de favorecidos do
