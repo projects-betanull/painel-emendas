@@ -21,6 +21,7 @@ from .normalize import slug
 ESTATICOS = Path(__file__).parent / "site_static"
 PORTAL_DOWNLOAD = "https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares"
 PORTAL_CONSULTA = "https://portaldatransparencia.gov.br/emendas"
+NOME_SITE = "Painel de Emendas"
 POP_MIN_DESTAQUE = 50_000  # ranking por habitante só entre municípios desse porte para cima
 
 
@@ -54,6 +55,48 @@ def e(texto) -> str:
     return html.escape("" if texto is None or (isinstance(texto, float) and pd.isna(texto)) else str(texto))
 
 
+UFS = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia", "CE": "Ceará", "DF": "Distrito Federal",
+    "ES": "Espírito Santo", "GO": "Goiás", "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul", "MG": "Minas Gerais",
+    "PA": "Pará", "PB": "Paraíba", "PR": "Paraná", "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina",
+    "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins",
+}
+
+
+def caminho_uf(uf: str) -> str:
+    return f"uf/{uf.lower()}/"
+
+
+def json_ld(*objetos: dict) -> str:
+    """Dados estruturados (schema.org) para buscadores; '<' escapado para não fechar a tag."""
+    return "".join(
+        '<script type="application/ld+json">' + json.dumps(o, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c") + "</script>\n"
+        for o in objetos
+    )
+
+
+def migalhas_ld(itens: list[tuple[str, str]]) -> dict:
+    """BreadcrumbList a partir de [(nome, caminho relativo à raiz do site)]."""
+    return {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+        {"@type": "ListItem", "position": i, "name": n, "item": f"{config.SITE_URL}/{c}"} for i, (n, c) in enumerate(itens, 1)]}
+
+
+def dataset_ld(nome: str, descricao: str, caminho: str, desde: str, lugar: str, modificado: str) -> dict:
+    """Dataset para o Google Dataset Search, sempre apontando a fonte oficial."""
+    return {
+        "@context": "https://schema.org", "@type": "Dataset", "name": nome, "description": descricao,
+        "url": f"{config.SITE_URL}/{caminho}", "inLanguage": "pt-BR", "isAccessibleForFree": True,
+        "temporalCoverage": f"{desde}/..", "dateModified": modificado,
+        "spatialCoverage": {"@type": "Place", "name": lugar},
+        "isBasedOn": PORTAL_DOWNLOAD,
+        "sourceOrganization": {"@type": "GovernmentOrganization", "name": "Controladoria-Geral da União (Portal da Transparência)",
+                               "url": "https://portaldatransparencia.gov.br/"},
+        "publisher": {"@type": "Organization", "name": NOME_SITE, "url": config.SITE_URL},
+        "keywords": ["emendas parlamentares", "emendas pix", "transferências especiais", "orçamento federal", lugar],
+    }
+
+
 def caminho_municipio(nome: str, uf: str) -> str:
     return f"municipio/{slug(nome).replace(' ', '-')}-{uf.lower()}/"
 
@@ -69,8 +112,15 @@ def mascarar_documento(cod: str) -> str:
 # --------------------------------------------------------------------------- layout
 
 
-def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2014", url: str = "") -> str:
-    og_url = f'<meta property="og:url" content="{e(config.SITE_URL + "/" + url)}">' if url is not None else ""
+def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2014", url: str = "", extra_head: str = "") -> str:
+    og_url = ""
+    if url is not None:
+        completo = e(config.SITE_URL + "/" + url)
+        og_url = f'<link rel="canonical" href="{completo}">\n<meta property="og:url" content="{completo}">'
+    if config.GOOGLE_SITE_VERIFICATION:
+        extra_head += f'<meta name="google-site-verification" content="{e(config.GOOGLE_SITE_VERIFICATION)}">\n'
+    if config.BING_SITE_VERIFICATION:
+        extra_head += f'<meta name="msvalidate.01" content="{e(config.BING_SITE_VERIFICATION)}">\n'
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -82,8 +132,10 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <meta property="og:description" content="{e(descricao)}">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="{NOME_SITE}">
+<meta name="twitter:card" content="summary">
 {og_url}
-<link rel="icon" href="{raiz}icone.svg" type="image/svg+xml">
+{extra_head}<link rel="icon" href="{raiz}icone.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{raiz}estilo.css">
 </head>
 <body>
@@ -199,7 +251,9 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
         else:
             shutil.copytree(arq, destino / arq.name)
 
-    atualizado = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y")
+    agora = datetime.now(timezone.utc).astimezone()
+    atualizado = agora.strftime("%d/%m/%Y")
+    hoje_iso = agora.strftime("%Y-%m-%d")
     desde = str(int(fav["ano"].min()))
     baixar_qrcode(destino)
     nomes = {str(m["codigo_ibge"]): (m["nome"], m["uf"]) for m in municipios}
@@ -231,6 +285,14 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
     base["rank_uf"] = base.groupby("uf")["total"].rank(ascending=False, method="min").astype(int)
     qtd_uf = base["uf"].value_counts()
     mediana_uf = base.groupby("uf")["per_capita"].median()
+    # Municípios de cada UF em ordem de valor recebido (páginas de UF e links entre vizinhos).
+    por_uf: dict[str, list[str]] = {}
+    for c in base.index:
+        if c in nomes:
+            por_uf.setdefault(nomes[c][1], []).append(c)
+
+    def nome_uf(uf: str) -> str:
+        return UFS.get(uf, uf)
 
     # ---- páginas de município
     for codigo, total in totais.items():
@@ -261,11 +323,31 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
             resumo.append(f"Quem mais enviou: <strong>{e(top_aut.index[0])}</strong> ({brl_curto(top_aut.iloc[0])}).")
         hab = f" · {inteiro(b['pop'])} habitantes" if pd.notna(b["pop"]) else ""
 
+        # Links para os vizinhos no ranking da UF: ajudam o leitor a comparar e o buscador a achar as páginas.
+        fila = por_uf[uf]
+        i = fila.index(codigo)
+        ini = max(0, min(i - 2, len(fila) - 5))
+        vizinhos = [c for c in fila[ini:ini + 5] if c != codigo]
+        bloco_viz = ""
+        if vizinhos:
+            itens = "".join(f'<li><a href="../../{caminho_municipio(*nomes[c])}">{e(nomes[c][0])}</a> <span>{int(base.at[c, "rank_uf"])}º · {brl_curto(totais[c])}</span></li>'
+                            for c in vizinhos)
+            bloco_viz = (f'<section><h2>Compare com outros municípios de {e(uf)}</h2>\n<ul class="vizinhos">{itens}</ul>\n'
+                         f'<p class="dica"><a href="../../{caminho_uf(uf)}">Ver todos os municípios de {e(nome_uf(uf))} ›</a></p></section>')
+        titulo_pag = f"Emendas parlamentares em {nome} ({uf}): quanto recebeu e de quem"
+        desc_pag = f"{nome} ({uf}) recebeu {brl(total)} em emendas parlamentares desde {desde}"
+        if pd.notna(b["per_capita"]):
+            desc_pag += f", {brl(b['per_capita'])} por habitante"
+        desc_pag += ". Veja por ano, quem enviou e quem recebeu, com dados do Portal da Transparência."
+        dados_ld = json_ld(
+            migalhas_ld([("Início", ""), (nome_uf(uf), caminho_uf(uf)), (nome, rel)]),
+            dataset_ld(f"Emendas parlamentares recebidas em {nome} ({uf})", desc_pag, rel, desde, f"{nome}, {nome_uf(uf)}, Brasil", hoje_iso),
+        )
         url_pagina = f"{config.SITE_URL}/{rel}"
         texto_wpp = f"{nome} ({uf}) recebeu {brl_curto(total)} em emendas parlamentares desde {desde}. Veja quem mandou e quem recebeu: {url_pagina}"
         rotulo_m = f"{nome} ({uf})"
         corpo = f"""
-<p class="migalha"><a href="../../">Início</a> › {e(uf)} › {e(nome)}</p>
+<p class="migalha"><a href="../../">Início</a> › <a href="../../{caminho_uf(uf)}">{e(nome_uf(uf))}</a> › {e(nome)}</p>
 <h1>{e(nome)} <span class="uf">{e(uf)}</span></h1>
 <p class="contexto">{int(b['rank_uf'])}º de {int(qtd_uf[uf])} municípios de {e(uf)} em valor recebido{hab}</p>
 <p class="resumo-texto">{' '.join(resumo)}</p>
@@ -283,6 +365,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 <script>document.getElementById("pdf").onclick=()=>Passe.exigir(()=>{{document.querySelectorAll("#contratos details").forEach(d=>d.open=true);window.print();}});</script>
 <section><h2>Tipo de emenda {glossario("tipo", "Individual, de bancada, de comissão ou de relator; transferências especiais são as Emendas Pix.", "../../")}</h2>
 {tabela(["Tipo", "Valor", "%"], [[e(t), brl(v), pct(100 * v / total)] for t, v in top_tipo.items()], {1, 2})}</section>
+{bloco_viz}
 <aside class="origem"><strong>De onde vêm estes números:</strong> soma do campo "Valor Recebido" do arquivo de favorecidos do
 <a href="{PORTAL_DOWNLOAD}">Portal da Transparência</a> para favorecidos com sede em {e(nome)} ({e(uf)}), atualizado em {e(atualizado)}.
 Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de emendas</a>.{(" População: " + e(fonte_pop) + ".") if pd.notna(b["pop"]) and fonte_pop else ""}</aside>
@@ -293,13 +376,55 @@ Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de eme
         pasta = destino / rel
         pasta.mkdir(parents=True, exist_ok=True)
         (pasta / "index.html").write_text(
-            pagina(
-                f"Emendas parlamentares em {nome} ({uf})",
-                f"{nome} ({uf}) recebeu {brl(total)} em emendas parlamentares desde {desde}. Veja por ano, autor e favorecido.",
-                corpo, "../../", atualizado, desde, rel,
-            ),
+            pagina(titulo_pag, desc_pag, corpo, "../../", atualizado, desde, rel, dados_ld),
             encoding="utf-8",
         )
+
+    # ---- páginas de UF: todos os municípios do estado em uma lista só (porta de entrada para buscadores)
+    for uf, fila in sorted(por_uf.items()):
+        rel = caminho_uf(uf)
+        nu = nome_uf(uf)
+        total_uf = float(totais[fila].sum())
+        med = mediana_uf.get(uf)
+        qtd_mun = f"{inteiro(len(fila))} municípios" if len(fila) > 1 else "1 município"
+        resumo = [f"Favorecidos com sede em <strong>{qtd_mun}</strong> de {e(nu)} receberam "
+                  f"<strong>{brl(total_uf)}</strong> em emendas parlamentares de {desde} até hoje."]
+        resumo.append("Quem mais recebeu: " + ", ".join(f"{e(nomes[c][0])} ({brl_curto(totais[c])})" for c in fila[:3]) + ".")
+        if med and pd.notna(med) and len(fila) > 1:
+            resumo.append(f"A mediana entre os municípios é de <strong>{brl(med)} por habitante</strong>.")
+        linhas = [[f"{int(base.at[c, 'rank_uf'])}º", f'<a href="../../{caminho_municipio(*nomes[c])}">{e(nomes[c][0])}</a>', brl(totais[c]),
+                   brl(base.at[c, "per_capita"]) if pd.notna(base.at[c, "per_capita"]) else "–"] for c in fila]
+        titulo_pag = f"Emendas parlamentares em {nu} ({uf}): quanto cada município recebeu"
+        desc_pag = (f"Quanto cada município de {nu} recebeu em emendas parlamentares desde {desde}: {qtd_mun}, "
+                    f"com valor total e por habitante. Dados do Portal da Transparência.")
+        corpo = f"""
+<p class="migalha"><a href="../../">Início</a> › {e(nu)}</p>
+<h1>Emendas parlamentares em {e(nu)} <span class="uf">{e(uf)}</span></h1>
+<p class="resumo-texto">{' '.join(resumo)}</p>
+<p class="acoes"><a class="botao2" href="../../painel/#f.uf={quote(uf)}">Ver no painel</a>
+<a class="botao2" href="../../explorar/#l=autor&amp;c=ano&amp;f.uf={quote(uf)}">Quem mais enviou para {e(uf)}</a></p>
+<section><h2>Municípios de {e(nu)} por valor recebido</h2>
+{tabela(["Posição", "Município", "Valor recebido", "Por habitante"], linhas, {2, 3})}</section>
+<aside class="origem"><strong>De onde vêm estes números:</strong> soma do campo "Valor Recebido" do arquivo de favorecidos do
+<a href="{PORTAL_DOWNLOAD}">Portal da Transparência</a>, por município da sede do favorecido, atualizado em {e(atualizado)}.
+Confira emenda por emenda na
+<a href="{PORTAL_CONSULTA}">consulta oficial de emendas</a>.{(" População: " + e(fonte_pop) + ".") if fonte_pop else ""}</aside>
+<nav class="estados" aria-label="Outros estados"><h2>Outros estados</h2>
+<p>{" ".join(f'<a href="../../{caminho_uf(u)}">{e(u)}</a>' for u in sorted(por_uf) if u != uf)}</p></nav>
+"""
+        pasta = destino / rel
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / "index.html").write_text(
+            pagina(titulo_pag, desc_pag, corpo, "../../", atualizado, desde, rel, json_ld(
+                migalhas_ld([("Início", ""), (nu, rel)]),
+                dataset_ld(f"Emendas parlamentares recebidas por município em {nu}", desc_pag, rel, desde, f"{nu}, Brasil", hoje_iso))),
+            encoding="utf-8",
+        )
+    bloco_ufs = ""
+    if por_uf:
+        bloco_ufs = ('<section class="estados"><h2>Por estado</h2>\n<p>'
+                     + " ".join(f'<a href="{caminho_uf(u)}" title="Emendas parlamentares em {e(nome_uf(u))}">{e(nome_uf(u))}</a>' for u in sorted(por_uf, key=nome_uf))
+                     + "</p></section>")
 
     # ---- índice de busca (pequeno: só nome, UF, caminho e total)
     busca = [
@@ -337,12 +462,18 @@ Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de eme
 <section><h2>Os 10 municípios que mais receberam</h2>
 {tabela(["Município", "UF", "Valor recebido"], top, {2})}</section>
 {bloco_hab}
+{bloco_ufs}
 <script src="busca.js" defer></script>
 """
     (destino / "index.html").write_text(
-        pagina("Emendas parlamentares por município",
-               "Veja quanto cada município recebeu em emendas parlamentares, de quais parlamentares e para quem.",
-               corpo, "", atualizado, desde, ""),
+        pagina("Emendas parlamentares por município: quanto cada cidade recebeu e de quem",
+               f"Veja quanto cada município recebeu em emendas parlamentares desde {desde}, de quais parlamentares e para quem. "
+               "Dados do Portal da Transparência, atualizados todo dia.",
+               corpo, "", atualizado, desde, "", json_ld(
+                   {"@context": "https://schema.org", "@type": "WebSite", "name": NOME_SITE, "url": config.SITE_URL + "/", "inLanguage": "pt-BR"},
+                   dataset_ld("Emendas parlamentares federais por município", "Valores recebidos em emendas parlamentares federais por município, "
+                              f"autor e favorecido, de {desde} em diante, reorganizados a partir dos arquivos do Portal da Transparência.",
+                              "", desde, "Brasil", hoje_iso))),
         encoding="utf-8",
     )
     gerar_sobre(destino, atualizado, desde, fonte_pop)
@@ -500,9 +631,11 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
         (api / "ranking" / f"{uf}.json").write_text(json.dumps(rk, ensure_ascii=False, separators=(",", ":"), default=lambda x: None), encoding="utf-8")
     (api / "indice.json").write_text(json.dumps({f"{n}|{u}": c for c, (n, u) in nomes.items()}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     # Descoberta: robots, sitemap e llms.txt para buscadores e assistentes de IA.
-    urls = ["", "painel/", "explorar/", "sobre/", "ia/", "apoie/"] + [caminho_municipio(*nomes[l["codigo_ibge"]]) for l in linhas]
+    hoje = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+    urls = (["", "painel/", "explorar/", "sobre/", "ia/", "apoie/"] + [caminho_uf(u) for u in sorted(tab["uf"].unique())]
+            + [caminho_municipio(*nomes[l["codigo_ibge"]]) for l in linhas])
     (destino / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-        + "".join(f"<url><loc>{config.SITE_URL}/{html.escape(u)}</loc></url>" for u in urls) + "</urlset>\n", encoding="utf-8")
+        + "".join(f"<url><loc>{config.SITE_URL}/{html.escape(u)}</loc><lastmod>{hoje}</lastmod></url>" for u in urls) + "</urlset>\n", encoding="utf-8")
     (destino / "robots.txt").write_text(f"User-agent: *\nAllow: /\nDisallow: /gestao/\nSitemap: {config.SITE_URL}/sitemap.xml\n", encoding="utf-8")
     (destino / "llms.txt").write_text(f"""# Emendas parlamentares do Brasil
 
@@ -513,6 +646,8 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
 - Documentação: {config.SITE_URL}/ia/
 
 ## Páginas
+- Uma página por município: {config.SITE_URL}/municipio/campinas-sp/ (nome sem acento, hífen e a sigla do estado)
+- Uma página por estado, com todos os municípios: {config.SITE_URL}/uf/sp/
 - [Painel]({config.SITE_URL}/painel/)
 - [Explorar]({config.SITE_URL}/explorar/)
 - [Fontes, método e limites]({config.SITE_URL}/sobre/)

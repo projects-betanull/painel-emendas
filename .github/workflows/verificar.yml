@@ -28,7 +28,8 @@ jobs:
           echo "api/m direto (esperado 403): $(curl -s -o /dev/null -w '%{http_code}' $B/api/m/3509502.json)"
           echo "gestao com chave (esperado 200 e assinatura true): $(curl -s -H "x-admin-key: $ADMIN_KEY" $B/api/gestao)"
           echo "gestao sem chave (esperado 401): $(curl -s -o /dev/null -w '%{http_code}' $B/api/gestao)"
-          for p in / painel/ explorar/ ia/ sobre/ gestao/ sitemap.xml llms.txt; do echo "$p $(curl -s -o /dev/null -w '%{http_code}' $B/$p)"; done
+          for p in / painel/ explorar/ ia/ sobre/ gestao/ uf/sp/ municipio/campinas-sp/ sitemap.xml robots.txt llms.txt; do echo "$p $(curl -s -o /dev/null -w '%{http_code}' $B/$p)"; done
+          echo "SEO (esperado 1 1 1, e mais de 5000 URLs): $(curl -s $B/municipio/campinas-sp/ | grep -c 'rel="canonical"') $(curl -s $B/municipio/campinas-sp/ | grep -c '"@type":"Dataset"') $(curl -s $B/uf/sp/ | grep -c 'municipio/campinas-sp/') $(curl -s $B/sitemap.xml | grep -o '<loc>' | wc -l)"
           echo "--- LNURL do endereço"; curl -fsS https://coinos.io/.well-known/lnurlp/lizard43 | jq -c '{callback, minSendable, maxSendable, commentAllowed}'
           F=$(rpc '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"comprar_acesso","arguments":{}}}' | jq -r '.result.content[0].text' | jq -r .fatura_id)
           echo "fatura: ${F:0:30}..."
