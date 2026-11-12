@@ -139,3 +139,10 @@ th { font-size: .75rem; }
   .origem { color: #000; }
 }
 button.botao2 { background: transparent; color: var(--acento); font: inherit; font-weight: 600; cursor: pointer; }
+.migalha a { color: inherit; }
+.vizinhos { list-style: none; padding: 0; margin: .5rem 0; }
+.vizinhos li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--linha); }
+.vizinhos a { padding: .75rem 0; font-weight: 600; text-decoration: none; flex: 1; }
+.vizinhos span { color: var(--suave); font-size: .9rem; align-self: center; white-space: nowrap; }
+.estados p { display: flex; flex-wrap: wrap; gap: .5rem; }
+.estados a { border: 1px solid var(--linha); border-radius: 1.2rem; padding: .5rem .9rem; font-size: .9rem; text-decoration: none; min-height: 2.75rem; display: inline-flex; align-items: center; }

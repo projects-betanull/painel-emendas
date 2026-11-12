@@ -148,6 +148,40 @@ def test_site(tmp_path):
     assert (site / "estilo.css").exists() and (site / "apoie" / "index.html").exists()
 
 
+def test_seo(tmp_path, monkeypatch):
+    import re
+    import xml.etree.ElementTree as ET
+
+    from etl import config
+
+    monkeypatch.setattr(config, "GOOGLE_SITE_VERIFICATION", "codigo-teste")
+    site = tmp_path / "site"
+    build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site)])
+    campinas = (site / "municipio" / "campinas-sp" / "index.html").read_text(encoding="utf-8")
+    assert "<title>Emendas parlamentares em Campinas (SP): quanto recebeu e de quem</title>" in campinas
+    assert f'<link rel="canonical" href="{config.SITE_URL}/municipio/campinas-sp/">' in campinas
+    assert 'content="codigo-teste"' in campinas and 'href="../../uf/sp/"' in campinas
+    # Dados estruturados: JSON válido, com migalhas e Dataset apontando a fonte oficial.
+    blocos = [json.loads(b) for b in re.findall(r'<script type="application/ld\+json">(.*?)</script>', campinas, re.S)]
+    assert [b["@type"] for b in blocos] == ["BreadcrumbList", "Dataset"]
+    assert blocos[0]["itemListElement"][1]["item"] == f"{config.SITE_URL}/uf/sp/"
+    assert "portaldatransparencia.gov.br" in blocos[1]["isBasedOn"] and len(blocos[1]["description"]) >= 50
+    # Página do estado lista os municípios; a de outro estado liga os vizinhos.
+    sp = (site / "uf" / "sp" / "index.html").read_text(encoding="utf-8")
+    assert "Emendas parlamentares em São Paulo (SP): quanto cada município recebeu" in sp
+    assert 'href="../../municipio/campinas-sp/"' in sp and 'href="../../uf/ce/"' in sp
+    assert 'href="uf/sp/"' in (site / "index.html").read_text(encoding="utf-8")
+    # Sitemap: XML válido, com estados, municípios e data.
+    ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    urls = ET.parse(site / "sitemap.xml").getroot().findall("s:url", ns)
+    locs = {u.find("s:loc", ns).text for u in urls}
+    assert {f"{config.SITE_URL}/uf/sp/", f"{config.SITE_URL}/uf/ce/", f"{config.SITE_URL}/municipio/fortaleza-ce/"} <= locs
+    assert all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", u.find("s:lastmod", ns).text) for u in urls)
+    # Toda página do sitemap existe no site gerado.
+    for loc in locs:
+        assert (site / loc.removeprefix(config.SITE_URL + "/") / "index.html").exists(), loc
+
+
 def test_explorador(tmp_path):
     import subprocess
 

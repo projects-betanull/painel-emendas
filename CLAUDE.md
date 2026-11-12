@@ -6,7 +6,7 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `.github/workflows/etl.yml` roda todo dia 06:17 (Brasília): baixa os dados, testa, gera `site/` e publica no Cloudflare Pages (com `functions/`).
 - `etl/download.py`: Portal da Transparência (ZIP com 3 CSVs, novas tentativas se vier HTML), municípios (IBGE; cai para cópia kelvins no GitHub, pois o IBGE bloqueia o runner), população (IBGE/SIDRA).
 - `etl/normalize.py`: colunas, valores BR, localidade → código IBGE; `normalizar_favorecidos` (fonte dos totais por município, porque 83% do arquivo principal vem como "MÚLTIPLO").
-- `etl/build.py`: orquestra; `etl/site.py`: páginas estáticas, Sobre (fontes, base legal, LGPD), Apoie, JSON da API e sitemap/llms.txt; `etl/cubo.py`: cubo do Explorar (+ um por UF com favorecidos); `etl/bancadas.py`: membros das bancadas (Câmara e Senado).
+- `etl/build.py`: orquestra; `etl/site.py`: páginas estáticas (município e `/uf/xx/`, com link canônico e JSON-LD Dataset), Sobre (fontes, base legal, LGPD), Apoie, JSON da API e sitemap/llms.txt; `etl/cubo.py`: cubo do Explorar (+ um por UF com favorecidos); `etl/bancadas.py`: membros das bancadas (Câmara e Senado).
 - `etl/site_static/`: CSS, `motor.js` (pivô compartilhado), `explorar/`, `painel/`, `gestao/`, `ia/`.
 - `lib/mcp.js` + `functions/mcp.js`: servidor MCP (Streamable HTTP) em /mcp. Grátis: buscar_municipio, resumo_municipio. Pago (passe 24 h, 1000 sats): detalhes e ranking. Fatura via LNURL do endereço Lightning; conferência pela API pública de faturas do coinos; token HMAC com TOKEN_SECRET.
 - `functions/api/passe.js` + `etl/site_static/passe.js`: compra do passe no navegador (fatura, QR via qrcode.js baixado do unpkg no build, conferência a cada 3 s, token no localStorage; o token do MCP também vale).
@@ -18,6 +18,9 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 
 ## Segredos (GitHub → Settings → Secrets → Actions)
 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_KEY. TOKEN_SECRET é derivado da ADMIN_KEY no workflow.
+
+## Variáveis (GitHub → Settings → Variables → Actions)
+GOOGLE_SITE_VERIFICATION e BING_SITE_VERIFICATION: código da tag de verificação do Search Console e do Bing; o ETL põe em todas as páginas.
 
 ## Regras do projeto
 - Dados sempre com fonte oficial citada e "valores reproduzidos como publicados"; nada de juízo sobre legalidade.

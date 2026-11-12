@@ -20,6 +20,9 @@ jobs:
       # Primeiro ano carregado; o ETL usa tudo o que o Portal tiver a partir daqui.
       ANO_INICIAL: "2000"
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Códigos de verificação do Google Search Console e do Bing (Settings → Variables → Actions). Vazios = sem a tag.
+      GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+      BING_SITE_VERIFICATION: ${{ vars.BING_SITE_VERIFICATION }}
     steps:
       - uses: actions/checkout@v4
 
