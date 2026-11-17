@@ -438,7 +438,7 @@ def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | Non
             for l in f["convenios"]["lista"]:
                 l[4] = (l[4] or "")[:220]
         if c8 in ia_g:
-            i = ia_g[c8].drop_duplicates(["aid", "papel"])
+            i = ia_g[c8].sort_values("valor", ascending=False).drop_duplicates("aid")
             f["internacional"] = _registros(i, ["doador", "titulo", "ano_inicio", "ano_fim", "papel", "valor", "moeda", "aid", "nome", "ligacao"], 40, "valor")
         if c8 in ce_g:
             f["cepim"] = _registros(ce_g[c8].assign(o=0), ["convenio", "orgao", "motivo"], 20, "o")

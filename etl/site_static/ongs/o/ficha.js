@@ -27,7 +27,7 @@
 
     const mun = f.ibge ? esc(f.municipio) + " (" + esc(f.uf) + ")" : esc(f.municipio) + " (" + esc(f.uf) + ")";
     partes.push("<dl>" + [
-      ["CNPJ", esc(f.cnpj)], ["Natureza jurídica", esc(f.natureza)], ["Sede", mun], ["Fundação", esc(f.fundacao || "não informada")],
+      ["CNPJ", esc(f.cnpj)], ["Natureza jurídica", esc(f.natureza)], ["Sede", mun], ["Fundação", esc(f.fundacao ? f.fundacao.split("-").reverse().join("/") : "não informada")],
       ["Área de atuação", esc(f.areas || "não informada")],
       ["Estabelecimentos", f.estabelecimentos + (f.ufs && f.ufs.length > 1 ? " em " + f.ufs.length + " estados (" + f.ufs.map(esc).join(", ") + ")" : "")],
     ].map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>");
