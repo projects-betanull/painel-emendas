@@ -153,7 +153,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <body>
 <header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
 <span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
+<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ongs/">ONGs</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
 <main>
 {corpo}
 </main>
@@ -438,7 +438,8 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 {tabela(["Autor da emenda", "Valor"], [[e(a), brl(v)] for a, v in top_aut.items()], {1})}</section>
 <section><h2>Quem recebeu {glossario("favorecido", "Quem recebeu o dinheiro direto da União: prefeitura, fundo, entidade.", "../../")}</h2>
 {tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
-<p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a></p></section>
+<p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a>
+· <a href="../../ongs/#uf={uf}&amp;q={quote(nome)}">ONGs com sede em {e(nome)} ›</a></p></section>
 {secao_contratos(cnpj_prefeitura(top_fav_todos), contratos)}
 <script src="../../qrcode.js"></script><script src="../../passe.js"></script>
 <script>document.getElementById("pdf").onclick=()=>Passe.exigir(()=>{{document.querySelectorAll("#contratos details").forEach(d=>d.open=true);window.print();}});</script>
@@ -757,6 +758,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
 - Uma página por estado, com todos os municípios: {config.SITE_URL}/uf/sp/
 - [Painel]({config.SITE_URL}/painel/)
 - [Explorar]({config.SITE_URL}/explorar/)
+- [Transparência das ONGs]({config.SITE_URL}/ongs/): todas as OSCs do país, com emendas, convênios federais, CEPIM e financiamento internacional declarado (IATI); ficha em {config.SITE_URL}/ongs/o/?c=<8 primeiros dígitos do CNPJ>
 - [Fontes, método e limites]({config.SITE_URL}/sobre/)
 - [Dados completos, como citar e passe de 24 h]({config.SITE_URL}/dados/)
 """, encoding="utf-8")

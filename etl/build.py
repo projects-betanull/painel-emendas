@@ -190,6 +190,9 @@ def main(argv=None) -> dict:
             from .bancadas import gravar_bancadas
 
             gravar_bancadas(sorted(int(x) for x in fato["ano"].dropna().unique()), args.site)
+        from .ongs import gerar as gerar_ongs
+
+        qualidade["ongs"] = gerar_ongs(fav, args.site, baixar_fontes=not args.sem_baixar)
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
