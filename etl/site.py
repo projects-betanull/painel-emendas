@@ -232,16 +232,25 @@ def secao_contratos(cnpj: str, contratos: dict | None) -> str:
     return f'<section id="contratos">{titulo}\n<div class="conteudo">{corpo}{quando}</div></section>'
 
 
+def preco_passe() -> str:
+    """Frase do preço do passe: Pix (se configurado) e Lightning."""
+    ln = f"<strong>{inteiro(config.PRECO_SATS)} sats</strong> com qualquer carteira Lightning"
+    if config.PRECO_PIX_REAIS:
+        reais = f"{float(config.PRECO_PIX_REAIS):.2f}".replace(".", ",")
+        return f"<strong>R$ {reais} no Pix</strong> (pagamento processado pela Kiwify) ou {ln}."
+    return f"{ln} (alguns reais)."
+
+
 def bloco_passe(raiz: str) -> str:
     """Oferta do passe de 24 h: o que libera, preço e botão de compra (passe.js)."""
-    return f"""<section class="passe-oferta" id="passe"><h2>Passe de 24 horas ⚡</h2>
+    return f"""<section class="passe-oferta" id="passe"><h2>Passe de 24 horas</h2>
 <p>Para quem precisa dos dados completos: jornalistas, assessorias, pesquisadores e equipes de prefeituras.</p>
 <ul>
 <li>Tabela completa e download em <strong>CSV</strong> no <a href="{raiz}explorar/">Explorar</a>, sem limite de linhas</li>
 <li><strong>Relatório em PDF</strong> de qualquer município, com as empresas contratadas pela prefeitura (PNCP)</li>
 <li>Rankings e detalhes no <a href="{raiz}ia/">servidor MCP</a> para assistentes de IA: o mesmo passe vale lá</li>
 </ul>
-<p><strong>{inteiro(config.PRECO_SATS)} sats</strong> (alguns reais), pagos com qualquer carteira Lightning. Sem cadastro e sem assinatura.</p>
+<p>{preco_passe()} Sem cadastro e sem assinatura.</p>
 <p><button type="button" class="passe-comprar">Comprar passe de 24 h</button></p>
 <script src="{raiz}qrcode.js"></script><script src="{raiz}passe.js"></script>
 <script>document.querySelectorAll(".passe-comprar").forEach(b=>b.onclick=()=>Passe.exigir(()=>{{location.href="{raiz}explorar/";}}));</script>
@@ -276,7 +285,7 @@ Dados de {e(desde)} em diante, atualizados todo dia.</p>
     (pasta / "index.html").write_text(
         pagina("Dados completos de emendas parlamentares: CSV, relatório em PDF e como citar",
                "Tabela completa e CSV de emendas parlamentares por município, relatório em PDF e acesso para IA, "
-               "com passe de 24 horas pago em Lightning. Como citar a fonte.", corpo, "../", atualizado, desde, "dados/"),
+               "com passe de 24 horas pago em Pix ou Lightning. Como citar a fonte." if config.PRECO_PIX_REAIS else "com passe de 24 horas pago em Lightning. Como citar a fonte.", corpo, "../", atualizado, desde, "dados/"),
         encoding="utf-8",
     )
 

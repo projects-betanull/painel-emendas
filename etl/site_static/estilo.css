@@ -132,6 +132,10 @@ th { font-size: .75rem; }
 .passe-qr svg { width: min(240px, 65vw); height: auto; display: block; }
 .passe details { text-align: left; margin-top: .75rem; font-size: .9rem; }
 .passe-tk { width: 100%; font: inherit; padding: .5rem; margin: .4rem 0; border: 1px solid var(--linha); border-radius: .4rem; background: var(--fundo); color: var(--tinta); }
+.passe-abas { display: flex; gap: .4rem; justify-content: center; margin: .5rem 0 .75rem; }
+.passe-abas[hidden] { display: none; }
+.passe-aba { font: inherit; padding: .45rem 1rem; min-height: 2.75rem; border: 1px solid var(--linha); border-radius: 2rem; background: transparent; color: var(--tinta); cursor: pointer; }
+.passe-aba[aria-selected="true"] { border-color: var(--acento); background: var(--acento); color: var(--fundo); }
 .pago { font-size: .85rem; color: var(--acento); font-weight: 600; }
 @media print {
   .topo, footer, .acoes, .apoio, .passe-fundo, .glos, #contratos details, .dica a { display: none !important; }
