@@ -146,3 +146,7 @@ button.botao2 { background: transparent; color: var(--acento); font: inherit; fo
 .vizinhos span { color: var(--suave); font-size: .9rem; align-self: center; white-space: nowrap; }
 .estados p { display: flex; flex-wrap: wrap; gap: .5rem; }
 .estados a { border: 1px solid var(--linha); border-radius: 1.2rem; padding: .5rem .9rem; font-size: .9rem; text-decoration: none; min-height: 2.75rem; display: inline-flex; align-items: center; }
+.passe-oferta { border: 2px solid var(--acento); border-radius: .8rem; padding: 1rem 1.25rem; margin-top: 2rem; }
+.passe-oferta h2 { margin-top: 0; }
+.passe-oferta ul { padding-left: 1.2rem; }
+.citacao { border-left: 4px solid var(--linha); padding: .5rem 1rem; background: rgba(0,0,0,.03); }

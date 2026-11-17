@@ -141,7 +141,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <body>
 <header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
 <span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a></nav></header>
+<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
 <main>
 {corpo}
 </main>
@@ -230,6 +230,55 @@ def secao_contratos(cnpj: str, contratos: dict | None) -> str:
         if d["omitidos_pessoa_fisica"]:
             corpo += f'<p class="dica">{d["omitidos_pessoa_fisica"]} contrato(s) com pessoa física omitido(s).</p>'
     return f'<section id="contratos">{titulo}\n<div class="conteudo">{corpo}{quando}</div></section>'
+
+
+def bloco_passe(raiz: str) -> str:
+    """Oferta do passe de 24 h: o que libera, preço e botão de compra (passe.js)."""
+    return f"""<section class="passe-oferta" id="passe"><h2>Passe de 24 horas ⚡</h2>
+<p>Para quem precisa dos dados completos: jornalistas, assessorias, pesquisadores e equipes de prefeituras.</p>
+<ul>
+<li>Tabela completa e download em <strong>CSV</strong> no <a href="{raiz}explorar/">Explorar</a>, sem limite de linhas</li>
+<li><strong>Relatório em PDF</strong> de qualquer município, com as empresas contratadas pela prefeitura (PNCP)</li>
+<li>Rankings e detalhes no <a href="{raiz}ia/">servidor MCP</a> para assistentes de IA: o mesmo passe vale lá</li>
+</ul>
+<p><strong>{inteiro(config.PRECO_SATS)} sats</strong> (alguns reais), pagos com qualquer carteira Lightning. Sem cadastro e sem assinatura.</p>
+<p><button type="button" class="passe-comprar">Comprar passe de 24 h</button></p>
+<script src="{raiz}qrcode.js"></script><script src="{raiz}passe.js"></script>
+<script>document.querySelectorAll(".passe-comprar").forEach(b=>b.onclick=()=>Passe.exigir(()=>{{location.href="{raiz}explorar/";}}));</script>
+</section>"""
+
+
+def gerar_dados(destino: Path, atualizado: str, desde: str) -> None:
+    """Página para quem vai citar ou reutilizar os dados (imprensa, assessorias, pesquisa) e comprar o passe."""
+    corpo = f"""
+<h1>Dados completos, imprensa e equipes</h1>
+<p>As páginas de município e de estado, o Painel e o Explorar (até o limite de linhas) são <strong>gratuitos</strong>.
+Para trabalho com os dados completos, há o passe de 24 horas.</p>
+{bloco_passe("../")}
+<h2>Como citar</h2>
+<p class="citacao">Fonte: Portal da Transparência (CGU), dados de emendas parlamentares por favorecido, organizados pelo
+Painel de Emendas ({e(config.SITE_URL.replace("https://", ""))}), consulta em {e(atualizado)}.</p>
+<p>A fonte original é sempre o <a href="{PORTAL_DOWNLOAD}">Portal da Transparência</a>. Os valores são reproduzidos como
+publicados e não constituem juízo sobre a legalidade de nenhuma emenda. Antes de publicar, leia os
+<a href="../sobre/">limites dos dados</a>: o favorecido é quem recebeu o dinheiro da União, não a empresa contratada depois.</p>
+<h2>O que dá para fazer de graça</h2>
+<ul>
+<li>Página de cada município (<a href="../municipio/campinas-sp/">exemplo</a>) e de cada estado (<a href="../uf/sp/">exemplo</a>), com link para compartilhar.</li>
+<li><a href="../painel/">Painel</a> com gráficos filtráveis e <a href="../explorar/">Explorar</a> com tabela dinâmica (pivô) por autor, ano, área e estado.</li>
+<li>Ferramentas gratuitas do <a href="../ia/">servidor MCP</a> para assistentes de IA: buscar município e resumo.</li>
+</ul>
+<h2>Precisa de outro recorte?</h2>
+<p>Pedidos de recorte, correções e sugestões: <a href="{config.REPO_URL}/issues">abra um aviso aqui</a>.
+Dados de {e(desde)} em diante, atualizados todo dia.</p>
+"""
+    pasta = destino / "dados"
+    pasta.mkdir(parents=True, exist_ok=True)
+    (pasta / "index.html").write_text(
+        pagina("Dados completos de emendas parlamentares: CSV, relatório em PDF e como citar",
+               "Tabela completa e CSV de emendas parlamentares por município, relatório em PDF e acesso para IA, "
+               "com passe de 24 horas pago em Lightning. Como citar a fonte.", corpo, "../", atualizado, desde, "dados/"),
+        encoding="utf-8",
+    )
 
 
 def glossario(termo: str, texto: str, raiz: str) -> str:
@@ -463,6 +512,7 @@ Confira emenda por emenda na
 {tabela(["Município", "UF", "Valor recebido"], top, {2})}</section>
 {bloco_hab}
 {bloco_ufs}
+{bloco_passe("")}
 <script src="busca.js" defer></script>
 """
     (destino / "index.html").write_text(
@@ -478,6 +528,7 @@ Confira emenda por emenda na
     )
     gerar_sobre(destino, atualizado, desde, fonte_pop)
     gerar_apoie(destino, atualizado, desde)
+    gerar_dados(destino, atualizado, desde)
     return len(totais)
 
 
@@ -561,6 +612,7 @@ pela rede Lightning, de qualquer valor.</p>
 <p class="dica">Aponte a câmera da sua carteira Lightning para o QR code, ou copie o endereço e cole na
 opção de enviar. Funciona com qualquer carteira que aceite Lightning Address.</p>
 </div>
+{bloco_passe("../")}
 <script>
 document.getElementById("copiar").addEventListener("click", async (ev) => {{
   const b = ev.currentTarget;
@@ -632,7 +684,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
     (api / "indice.json").write_text(json.dumps({f"{n}|{u}": c for c, (n, u) in nomes.items()}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     # Descoberta: robots, sitemap e llms.txt para buscadores e assistentes de IA.
     hoje = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
-    urls = (["", "painel/", "explorar/", "sobre/", "ia/", "apoie/"] + [caminho_uf(u) for u in sorted(tab["uf"].unique())]
+    urls = (["", "painel/", "explorar/", "sobre/", "ia/", "apoie/", "dados/"] + [caminho_uf(u) for u in sorted(tab["uf"].unique())]
             + [caminho_municipio(*nomes[l["codigo_ibge"]]) for l in linhas])
     (destino / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         + "".join(f"<url><loc>{config.SITE_URL}/{html.escape(u)}</loc><lastmod>{hoje}</lastmod></url>" for u in urls) + "</urlset>\n", encoding="utf-8")
@@ -651,6 +703,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
 - [Painel]({config.SITE_URL}/painel/)
 - [Explorar]({config.SITE_URL}/explorar/)
 - [Fontes, método e limites]({config.SITE_URL}/sobre/)
+- [Dados completos, como citar e passe de 24 h]({config.SITE_URL}/dados/)
 """, encoding="utf-8")
     if qualidade:
         (api / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False), encoding="utf-8")

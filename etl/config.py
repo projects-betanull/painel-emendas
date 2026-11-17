@@ -30,6 +30,8 @@ CSV_SEP = ";"
 
 # Endereço Lightning (coinos) para contribuições, mostrado na página Apoie.
 LIGHTNING_ADDRESS = os.environ.get("LIGHTNING_ADDRESS", "lizard43@coinos.io")
+# Preço do passe de 24 h (sats), mostrado nas páginas; o valor cobrado vem de PRECO_SATS no Cloudflare.
+PRECO_SATS = int(os.environ.get("PRECO_SATS") or 1000)
 
 # Endereço público do site (links de compartilhamento) e do repositório (correções).
 SITE_URL = os.environ.get("SITE_URL", "https://painel-emendas.pages.dev")
