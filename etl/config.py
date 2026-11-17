@@ -32,6 +32,8 @@ CSV_SEP = ";"
 LIGHTNING_ADDRESS = os.environ.get("LIGHTNING_ADDRESS", "lizard43@coinos.io")
 # Preço do passe de 24 h (sats), mostrado nas páginas; o valor cobrado vem de PRECO_SATS no Cloudflare.
 PRECO_SATS = int(os.environ.get("PRECO_SATS") or 1000)
+# Preço do passe por Pix (Kiwify), em reais. Vazio = Pix desligado nas páginas (variável PRECO_PIX_REAIS no GitHub).
+PRECO_PIX_REAIS = os.environ.get("PRECO_PIX_REAIS", "").replace(",", ".").strip()
 
 # Endereço público do site (links de compartilhamento) e do repositório (correções).
 SITE_URL = os.environ.get("SITE_URL", "https://painel-emendas.pages.dev")

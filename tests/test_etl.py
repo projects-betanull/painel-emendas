@@ -226,7 +226,7 @@ def test_mcp(tmp_path):
     build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site), "--ano-inicial", "2020"])
     raiz = Path(__file__).parent.parent
     r = subprocess.run(["node", str(raiz / "tests" / "test_mcp.mjs"), str(site)], capture_output=True, text=True)
-    assert r.returncode == 0 and "mcp ok" in r.stdout, r.stdout + r.stderr
+    assert r.returncode == 0 and "mcp ok" in r.stdout and "kiwify ok" in r.stdout, r.stdout + r.stderr
 
 
 def _contrato(orgao, seq, ni, valor, pub, esfera="M", tipo="PJ", ass=None):

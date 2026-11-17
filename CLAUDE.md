@@ -1,6 +1,6 @@
 # Painel de Emendas — contexto para o Claude Code
 
-Site público (https://painel-emendas.pages.dev) que mostra quanto cada município recebeu em emendas parlamentares federais, de quem e para quem. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança via Lightning (lizard43@coinos.io): no MCP e no site (passe de 24 h: tabela completa e CSV no Explorar, relatório em PDF do município).
+Site público (https://painel-emendas.pages.dev) que mostra quanto cada município recebeu em emendas parlamentares federais, de quem e para quem. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança via Lightning (lizard43@coinos.io) no MCP e no site, e via Pix pela Kiwify só no site (a venda sai em nome da Kiwify, sem expor o nome do dono) (passe de 24 h: tabela completa e CSV no Explorar, relatório em PDF do município).
 
 ## Como funciona
 - `.github/workflows/etl.yml` roda todo dia 06:17 (Brasília): baixa os dados, testa, gera `site/` e publica no Cloudflare Pages (com `functions/`).
@@ -10,6 +10,7 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `etl/site_static/`: CSS, `motor.js` (pivô compartilhado), `explorar/`, `painel/`, `gestao/`, `ia/`.
 - `lib/mcp.js` + `functions/mcp.js`: servidor MCP (Streamable HTTP) em /mcp. Grátis: buscar_municipio, resumo_municipio. Pago (passe 24 h, 1000 sats): detalhes e ranking. Fatura via LNURL do endereço Lightning; conferência pela API pública de faturas do coinos; token HMAC com TOKEN_SECRET.
 - `functions/api/passe.js` + `etl/site_static/passe.js`: compra do passe no navegador (fatura, QR via qrcode.js baixado do unpkg no build, conferência a cada 3 s, token no localStorage; o token do MCP também vale).
+- `functions/api/passe-pix.js` + `lib/kiwify.js`: passe por Pix. POST gera uma referência assinada (HMAC com TOKEN_SECRET) e o link do checkout da Kiwify com `?s1=ref&sck=ref`; GET ?ref= procura na API pública da Kiwify (`/v1/sales`, view_full_sale_details) uma venda paga do produto com essa referência e devolve o mesmo token do passe. Sem banco nem webhook. Sem as variáveis KIWIFY_*, responde 503 e o site mostra só Lightning.
 - `functions/api/gestao.js`: dados da página /gestao/, exige cabeçalho X-Admin-Key = ADMIN_KEY.
 - `functions/api/_middleware.js`: bloqueia acesso direto a /api/m e /api/ranking (só o MCP lê, via env.ASSETS).
 - `server.json` + `.github/workflows/mcp-registry.yml`: publicação no registro oficial de MCP (OIDC). Suba a versão em server.json a cada mudança relevante do MCP.
@@ -17,10 +18,11 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `.github/workflows/verificar.yml`: após cada ETL, testa site, MCP, bloqueios e fatura Lightning no ar.
 
 ## Segredos (GitHub → Settings → Secrets → Actions)
-CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_KEY. TOKEN_SECRET é derivado da ADMIN_KEY no workflow.
+CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_KEY. TOKEN_SECRET é derivado da ADMIN_KEY no workflow. Pix (opcional): KIWIFY_CLIENT_ID, KIWIFY_CLIENT_SECRET, KIWIFY_ACCOUNT_ID (Kiwify → Apps → API).
 
 ## Variáveis (GitHub → Settings → Variables → Actions)
 GOOGLE_SITE_VERIFICATION e BING_SITE_VERIFICATION: código da tag de verificação do Search Console e do Bing; o ETL põe em todas as páginas.
+Pix (opcional): KIWIFY_PRODUCT_ID, KIWIFY_CHECKOUT_URL (link do checkout do produto "Passe de 24 horas") e PRECO_PIX_REAIS (ex.: 12.90, igual ao preço do produto na Kiwify; vazio = Pix some das páginas).
 
 ## Regras do projeto
 - Dados sempre com fonte oficial citada e "valores reproduzidos como publicados"; nada de juízo sobre legalidade.
