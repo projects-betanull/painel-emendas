@@ -146,6 +146,8 @@ def test_site(tmp_path):
     busca = json.loads((site / "busca.json").read_text(encoding="utf-8"))
     assert {m["n"] for m in busca} == {"Campinas", "Fortaleza"}
     assert (site / "estilo.css").exists() and (site / "apoie" / "index.html").exists()
+    dados = (site / "dados" / "index.html").read_text(encoding="utf-8")
+    assert "Como citar" in dados and "passe.js" in dados and "Passe.exigir" in (site / "index.html").read_text(encoding="utf-8")
 
 
 def test_seo(tmp_path, monkeypatch):

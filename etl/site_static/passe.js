@@ -42,10 +42,14 @@
       const r = await fetch("/api/passe", { method: "POST" }); f = await r.json();
       if (!f.fatura) throw new Error(f.erro);
     } catch (e) { corpo.innerHTML = "<p>Não foi possível gerar a fatura agora. Tente de novo em instantes.</p>"; return; }
-    corpo.innerHTML = `<p><strong>${f.preco.toLocaleString("pt-BR")} sats</strong></p>
+    const reais = f.reais ? ` <span class="dica">≈ ${f.reais.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>` : "";
+    corpo.innerHTML = `<p><strong>${f.preco.toLocaleString("pt-BR")} sats</strong>${reais}</p>
       <a class="passe-qr" href="lightning:${f.fatura}">${qr(f.fatura)}</a>
       <p><a class="botao" href="lightning:${f.fatura}">Abrir na carteira</a> <button type="button" class="botao2 passe-copiar">Copiar fatura</button></p>
-      <p class="dica passe-status">Aguardando o pagamento…</p>`;
+      <p class="dica passe-status">Aguardando o pagamento…</p>
+      <details class="dica"><summary>Não tenho carteira Lightning</summary>Instale uma carteira Lightning gratuita no celular
+      ou abra uma conta pelo navegador em <a href="https://coinos.io/" rel="noopener">coinos.io</a>, coloque alguns reais em bitcoin
+      e aponte a câmera para o QR code. O passe libera sozinho assim que o pagamento chega.</details>`;
     corpo.querySelector(".passe-copiar").onclick = async (e) => { try { await navigator.clipboard.writeText(f.fatura); e.target.textContent = "Copiada ✓"; } catch (x) {} };
     const ini = Date.now();
     while (janela && Date.now() - ini < 15 * 60e3) {
