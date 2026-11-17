@@ -34,3 +34,8 @@ LIGHTNING_ADDRESS = os.environ.get("LIGHTNING_ADDRESS", "lizard43@coinos.io")
 # Endereço público do site (links de compartilhamento) e do repositório (correções).
 SITE_URL = os.environ.get("SITE_URL", "https://painel-emendas.pages.dev")
 REPO_URL = "https://github.com/projects-betanull/painel-emendas"
+
+# Códigos de verificação de propriedade (Google Search Console e Bing Webmaster Tools).
+# Vazios até o cadastro; o ETL lê das variáveis do repositório e põe a tag em todas as páginas.
+GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "")
