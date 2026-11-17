@@ -4,17 +4,40 @@ jobs:
   sondar:
     runs-on: ubuntu-latest
     steps:
-      - name: Apoiadores (ADPF 854)
+      - name: Mapa das OSCs (IPEA) - cabeçalho e amostra
         run: |
-          curl -sL -A "Mozilla/5.0" https://portaldatransparencia.gov.br/emendas/adpf854 -o a.html; echo "status/size: $(wc -c < a.html)"
-          grep -oiE 'href="[^"]+\.(xlsx?|csv|zip|ods|pdf)"' a.html | sort -u | head -40
-      - name: PNCP contratos (Prefeitura de Campinas, 90 dias)
+          curl -sL -A "Mozilla/5.0" -r 0-6000 https://mapaosc.ipea.gov.br/download/20260806_MOSC_baseDivulgacao.csv -o m.csv -w "HTTP %{http_code}\n"; file m.csv; head -c 6000 m.csv | iconv -f latin1 -t utf8 2>/dev/null || head -c 6000 m.csv
+          echo; curl -sIL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/download/20260806_MOSC_baseDivulgacao.csv | grep -iE 'HTTP|length|type|modified'
+          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/base-dados | grep -oiE 'href="[^"]+\.(csv|xlsx?|zip)"' | sort -u
+      - name: Mapa das OSCs - dicionário e recursos
         run: |
-          D1=$(date -d '-90 days' +%Y%m%d); D2=$(date +%Y%m%d)
-          curl -s -o p.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=$D1&dataFinal=$D2&cnpjOrgao=51885242000140&pagina=1&tamanhoPagina=10"
-          head -c 1500 p.json; echo
-          curl -s -o q.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/pncp/v1/orgaos/51885242000140/contratos?pagina=1&tamanhoPagina=5"; head -c 600 q.json; echo
-      - name: Emendas apresentadas 2002–2013 (Câmara/Senado)
+          pip -q install openpyxl xlrd pandas
+          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/4038-dicionario-de-dados-mapa-oscs.xlsx -o d.xlsx
+          python -c "import pandas as pd;[print(n, '\n', d.head(80).to_string()) for n,d in pd.read_excel('d.xlsx',sheet_name=None).items()]" || true
+          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/4786-recursososc.xls -o r.xls
+          python -c "import pandas as pd;[print(n, d.shape, '\n', d.head(8).to_string()) for n,d in pd.read_excel('r.xls',sheet_name=None).items()]" || true
+          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/1754-20250718analiseoscinternacionais3204.xlsx -o i.xlsx
+          python -c "import pandas as pd;[print(n, d.shape, '\n', d.head(5).to_string()) for n,d in pd.read_excel('i.xlsx',sheet_name=None).items()]" || true
+      - name: Transferegov (convênios e propostas)
         run: |
-          for u in "https://www12.senado.leg.br/orcamento/documentos/loa" "https://www2.camara.leg.br/orcamento-da-uniao/leis-orcamentarias/loa" "https://dadosabertos.camara.leg.br/swagger/api.html"; do
-            echo "== $u"; curl -sL -A "Mozilla/5.0" "$u" -o c.html -w "HTTP %{http_code} " ; wc -c < c.html; grep -oiE 'href="[^"]*(emenda|Emenda)[^"]*"' c.html | sort -u | head -15; done
+          for f in siconv_proposta siconv_convenio siconv_pagamento; do
+            u="https://repositorio.dados.gov.br/seges/detru/$f.csv.zip"; echo "== $u"
+            curl -sIL -A "Mozilla/5.0" "$u" | grep -iE 'HTTP|length|modified'
+          done
+          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/ | grep -oiE 'href="[^"]+"' | head -60
+          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/siconv_proposta.csv.zip -o p.zip && unzip -l p.zip && unzip -p p.zip | head -3
+          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/siconv_convenio.csv.zip -o c.zip && unzip -l c.zip && unzip -p c.zip | head -3
+      - name: Portal da Transparência (CEPIM)
+        run: |
+          D=$(date -d '-3 days' +%Y%m%d)
+          curl -sL -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/cepim/$D" -o cep.zip -w "HTTP %{http_code} %{content_type}\n"; unzip -l cep.zip && unzip -p cep.zip | head -3 | iconv -f latin1 -t utf8
+      - name: IATI (d-portal) - Brasil
+        run: |
+          curl -s -m 60 "https://d-portal.org/q.json?from=act,country&country_code=BR&limit=2" | head -c 3000; echo
+          curl -s -m 60 "https://d-portal.org/q.json?from=act,country&country_code=BR&select=count" | head -c 500; echo
+          curl -s -m 60 "https://d-portal.org/q.csv?from=act,country&country_code=BR&limit=3" | head -c 3000; echo
+          curl -s -m 60 "https://d-portal.org/q.json?from=trans,country&country_code=BR&limit=2" | head -c 3000; echo
+      - name: foreignassistance.gov
+        run: |
+          curl -sL -m 60 -A "Mozilla/5.0" https://foreignassistance.gov/data -o f.html -w "HTTP %{http_code}\n"; grep -oiE 'https?://[^"]+\.(csv|zip)' f.html | sort -u | head
+          curl -sIL -m 60 https://s3.amazonaws.com/files.explorer.devtechlab.com/us_foreign_aid_complete.csv | grep -iE 'HTTP|length'
