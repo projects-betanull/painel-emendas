@@ -96,3 +96,10 @@ def test_iati_e_montagem(org, tmp_path):
     assert am[0][0] == "11222333" and am[0][3] & 1 and am[0][3] & 2 and am[0][3] & 4
     html = (tmp_path / "ongs" / "index.html").read_text()
     assert "Transparência das ONGs" in html and 'o/?c=11222333' in html
+
+
+def test_internacionais_raiz_com_8_digitos(tmp_path):
+    arq = tmp_path / "i.xlsx"
+    pd.DataFrame({"cnpj_basico": ["05911345", "10517714"], "PaisChecagemIPEA": ["Brasil", "Estados Unidos"],
+                  "ChecadoEstrangeiroIPEA": [0, 1]}).to_excel(arq, sheet_name="OSCs_Microdados", index=False)
+    assert ongs.ler_internacionais(arq) == {"10517714": "Estados Unidos"}

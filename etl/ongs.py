@@ -229,7 +229,9 @@ def ler_internacionais(fonte) -> dict[str, str]:
         print(f"aviso: ongs: lista de OSCs internacionais ilegível ({erro})")
         return {}
     ok = df[pd.to_numeric(df.get("ChecadoEstrangeiroIPEA"), errors="coerce").eq(1)]
-    return {cnpj8(r["cnpj_basico"]): str(r.get("PaisChecagemIPEA") or "").strip() for _, r in ok.iterrows() if cnpj8(r["cnpj_basico"])}
+    # cnpj_basico já é a raiz (8 dígitos), às vezes sem os zeros à esquerda.
+    return {digitos(r["cnpj_basico"]).zfill(8): str(r.get("PaisChecagemIPEA") or "").strip()
+            for _, r in ok.iterrows() if digitos(r["cnpj_basico"])}
 
 
 def _ler_portal(fonte, nome_contem: str) -> pd.DataFrame:
