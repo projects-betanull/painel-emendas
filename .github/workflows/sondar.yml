@@ -4,40 +4,39 @@ jobs:
   sondar:
     runs-on: ubuntu-latest
     steps:
-      - name: Mapa das OSCs (IPEA) - cabeçalho e amostra
-        run: |
-          curl -sL -A "Mozilla/5.0" -r 0-6000 https://mapaosc.ipea.gov.br/download/20260806_MOSC_baseDivulgacao.csv -o m.csv -w "HTTP %{http_code}\n"; file m.csv; head -c 6000 m.csv | iconv -f latin1 -t utf8 2>/dev/null || head -c 6000 m.csv
-          echo; curl -sIL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/download/20260806_MOSC_baseDivulgacao.csv | grep -iE 'HTTP|length|type|modified'
-          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/base-dados | grep -oiE 'href="[^"]+\.(csv|xlsx?|zip)"' | sort -u
-      - name: Mapa das OSCs - dicionário e recursos
-        run: |
-          pip -q install openpyxl xlrd pandas
-          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/4038-dicionario-de-dados-mapa-oscs.xlsx -o d.xlsx
-          python -c "import pandas as pd;[print(n, '\n', d.head(80).to_string()) for n,d in pd.read_excel('d.xlsx',sheet_name=None).items()]" || true
-          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/4786-recursososc.xls -o r.xls
-          python -c "import pandas as pd;[print(n, d.shape, '\n', d.head(8).to_string()) for n,d in pd.read_excel('r.xls',sheet_name=None).items()]" || true
-          curl -sL -A "Mozilla/5.0" https://mapaosc.ipea.gov.br/arquivos/subitems/1754-20250718analiseoscinternacionais3204.xlsx -o i.xlsx
-          python -c "import pandas as pd;[print(n, d.shape, '\n', d.head(5).to_string()) for n,d in pd.read_excel('i.xlsx',sheet_name=None).items()]" || true
       - name: Transferegov (convênios e propostas)
+        continue-on-error: true
         run: |
-          for f in siconv_proposta siconv_convenio siconv_pagamento; do
-            u="https://repositorio.dados.gov.br/seges/detru/$f.csv.zip"; echo "== $u"
-            curl -sIL -A "Mozilla/5.0" "$u" | grep -iE 'HTTP|length|modified'
+          set +e
+          for b in http://repositorio.dados.gov.br https://repositorio.dados.gov.br; do
+            curl -sL -m 60 -A "Mozilla/5.0" "$b/seges/detru/data_carga_siconv.txt" -w " HTTP %{http_code}\n"
+            curl -sL -m 60 -A "Mozilla/5.0" "$b/seges/detru/" -w "\nHTTP %{http_code}\n" | head -c 1500; echo
           done
-          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/ | grep -oiE 'href="[^"]+"' | head -60
-          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/siconv_proposta.csv.zip -o p.zip && unzip -l p.zip && unzip -p p.zip | head -3
-          curl -sL -A "Mozilla/5.0" https://repositorio.dados.gov.br/seges/detru/siconv_convenio.csv.zip -o c.zip && unzip -l c.zip && unzip -p c.zip | head -3
+          curl -sL -m 300 -A "Mozilla/5.0" http://repositorio.dados.gov.br/seges/detru/siconv_proponentes.csv.zip -o pr.zip -w "HTTP %{http_code} %{size_download}\n"; unzip -l pr.zip; unzip -p pr.zip | head -3
+          curl -sL -m 600 -A "Mozilla/5.0" http://repositorio.dados.gov.br/seges/detru/siconv_proposta.csv.zip -o p.zip -w "HTTP %{http_code} %{size_download}\n"; unzip -l p.zip; unzip -p p.zip | head -3
+          curl -sL -m 600 -A "Mozilla/5.0" http://repositorio.dados.gov.br/seges/detru/siconv_convenio.csv.zip -o c.zip -w "HTTP %{http_code} %{size_download}\n"; unzip -l c.zip; unzip -p c.zip | head -3
+      - name: Portal da Transparência (convênios)
+        continue-on-error: true
+        run: |
+          set +e
+          for d in 0 1 2 3; do D=$(date -d "-$d days" +%Y%m%d)
+            curl -sL -m 600 -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/convenios/$D" -o cv.zip -w "$D HTTP %{http_code} %{content_type} %{size_download}\n"
+            unzip -l cv.zip 2>/dev/null && break; done
+          for f in $(unzip -Z1 cv.zip); do echo "== $f"; unzip -p cv.zip "$f" | head -3 | iconv -f latin1 -t utf8; done
       - name: Portal da Transparência (CEPIM)
+        continue-on-error: true
         run: |
           D=$(date -d '-3 days' +%Y%m%d)
           curl -sL -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/cepim/$D" -o cep.zip -w "HTTP %{http_code} %{content_type}\n"; unzip -l cep.zip && unzip -p cep.zip | head -3 | iconv -f latin1 -t utf8
       - name: IATI (d-portal) - Brasil
+        continue-on-error: true
         run: |
           curl -s -m 60 "https://d-portal.org/q.json?from=act,country&country_code=BR&limit=2" | head -c 3000; echo
           curl -s -m 60 "https://d-portal.org/q.json?from=act,country&country_code=BR&select=count" | head -c 500; echo
           curl -s -m 60 "https://d-portal.org/q.csv?from=act,country&country_code=BR&limit=3" | head -c 3000; echo
           curl -s -m 60 "https://d-portal.org/q.json?from=trans,country&country_code=BR&limit=2" | head -c 3000; echo
       - name: foreignassistance.gov
+        continue-on-error: true
         run: |
           curl -sL -m 60 -A "Mozilla/5.0" https://foreignassistance.gov/data -o f.html -w "HTTP %{http_code}\n"; grep -oiE 'https?://[^"]+\.(csv|zip)' f.html | sort -u | head
           curl -sIL -m 60 https://s3.amazonaws.com/files.explorer.devtechlab.com/us_foreign_aid_complete.csv | grep -iE 'HTTP|length'
