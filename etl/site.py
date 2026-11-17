@@ -153,7 +153,7 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <body>
 <header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
 <span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
+<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}parlamento/">Parlamento</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
 <main>
 {corpo}
 </main>
@@ -739,7 +739,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
     (api / "indice.json").write_text(json.dumps({f"{n}|{u}": c for c, (n, u) in nomes.items()}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     # Descoberta: robots, sitemap e llms.txt para buscadores e assistentes de IA.
     hoje = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
-    urls = (["", "painel/", "explorar/", "sobre/", "ia/", "apoie/", "dados/"] + [caminho_uf(u) for u in sorted(tab["uf"].unique())]
+    urls = (["", "painel/", "parlamento/", "explorar/", "sobre/", "ia/", "apoie/", "dados/"] + [caminho_uf(u) for u in sorted(tab["uf"].unique())]
             + [caminho_municipio(*nomes[l["codigo_ibge"]]) for l in linhas])
     (destino / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         + "".join(f"<url><loc>{config.SITE_URL}/{html.escape(u)}</loc><lastmod>{hoje}</lastmod></url>" for u in urls) + "</urlset>\n", encoding="utf-8")
@@ -756,6 +756,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
 - Uma página por município: {config.SITE_URL}/municipio/campinas-sp/ (nome sem acento, hífen e a sigla do estado)
 - Uma página por estado, com todos os municípios: {config.SITE_URL}/uf/sp/
 - [Painel]({config.SITE_URL}/painel/)
+- [Acompanhamento parlamentar]({config.SITE_URL}/parlamento/): presença, votos nominais e discursos no Plenário da Câmara e do Senado
 - [Explorar]({config.SITE_URL}/explorar/)
 - [Fontes, método e limites]({config.SITE_URL}/sobre/)
 - [Dados completos, como citar e passe de 24 h]({config.SITE_URL}/dados/)

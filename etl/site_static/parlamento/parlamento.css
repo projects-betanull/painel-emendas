@@ -1,0 +1,22 @@
+.parl-controles { align-items: flex-end; margin: 1rem 0; }
+.dia-nav { display: flex; gap: .25rem; align-items: center; }
+.dia-nav input { font: inherit; padding: .4rem .5rem; border: 1px solid var(--linha); border-radius: .4rem; background: var(--fundo); color: var(--tinta); }
+button.mini { margin: 0; padding: .35rem .7rem; }
+.congresso { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 0 .9rem; }
+.casa .estado { color: var(--suave); font-size: .85rem; text-align: right; }
+.hemiciclo svg { display: block; width: 100%; height: auto; }
+.hemiciclo circle { cursor: pointer; stroke: var(--fundo); stroke-width: .004; }
+.hemiciclo circle:hover, .hemiciclo circle.sel { stroke: var(--tinta); stroke-width: .012; }
+.legenda { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-wrap: wrap; gap: .2rem .8rem; font-size: .8rem; }
+.legenda li { display: flex; align-items: center; gap: .3rem; }
+.legenda i { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
+.pauta { display: flex; flex-direction: column; font-size: .8rem; color: var(--suave); }
+.pauta select { width: 100%; }
+.pauta-info { font-size: .85rem; color: var(--suave); margin: .3rem 0; min-height: 1em; }
+.vazio { color: var(--suave); text-align: center; padding: 2rem 0; }
+#detalhe .pessoa { display: flex; gap: 1rem; align-items: flex-start; }
+#detalhe img { width: 72px; height: 96px; object-fit: cover; border-radius: .4rem; background: var(--linha); }
+#detalhe ul, #discursos ul { padding-left: 1.1rem; }
+#discursos li, #detalhe li { margin: .35rem 0; font-size: .9rem; }
+.notas li { font-size: .9rem; margin: .3rem 0; }
+.pauta[hidden] { display: none; }
