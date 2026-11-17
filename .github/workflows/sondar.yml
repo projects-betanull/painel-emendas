@@ -1,20 +1,53 @@
 name: Sondar fontes novas
+
 on: { workflow_dispatch: {} }
+
+permissions:
+  contents: read
+
 jobs:
-  sondar:
+  etl:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Vazio enquanto o segredo não for criado; o passo de publicação é pulado.
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      # Vazio enquanto o segredo não for criado; a publicação do site é pulada.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Primeiro ano carregado; o ETL usa tudo o que o Portal tiver a partir daqui.
+      ANO_INICIAL: "2000"
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Códigos de verificação do Google Search Console e do Bing (Settings → Variables → Actions). Vazios = sem a tag.
+      GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+      BING_SITE_VERIFICATION: ${{ vars.BING_SITE_VERIFICATION }}
     steps:
-      - name: Apoiadores (ADPF 854)
-        run: |
-          curl -sL -A "Mozilla/5.0" https://portaldatransparencia.gov.br/emendas/adpf854 -o a.html; echo "status/size: $(wc -c < a.html)"
-          grep -oiE 'href="[^"]+\.(xlsx?|csv|zip|ods|pdf)"' a.html | sort -u | head -40
-      - name: PNCP contratos (Prefeitura de Campinas, 90 dias)
-        run: |
-          D1=$(date -d '-90 days' +%Y%m%d); D2=$(date +%Y%m%d)
-          curl -s -o p.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/consulta/v1/contratos?dataInicial=$D1&dataFinal=$D2&cnpjOrgao=51885242000140&pagina=1&tamanhoPagina=10"
-          head -c 1500 p.json; echo
-          curl -s -o q.json -w "HTTP %{http_code}\n" "https://pncp.gov.br/api/pncp/v1/orgaos/51885242000140/contratos?pagina=1&tamanhoPagina=5"; head -c 600 q.json; echo
-      - name: Emendas apresentadas 2002–2013 (Câmara/Senado)
-        run: |
-          for u in "https://www12.senado.leg.br/orcamento/documentos/loa" "https://www2.camara.leg.br/orcamento-da-uniao/leis-orcamentarias/loa" "https://dadosabertos.camara.leg.br/swagger/api.html"; do
-            echo "== $u"; curl -sL -A "Mozilla/5.0" "$u" -o c.html -w "HTTP %{http_code} " ; wc -c < c.html; grep -oiE 'href="[^"]*(emenda|Emenda)[^"]*"' c.html | sort -u | head -15; done
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Testes
+        run: python -m pytest -q
+
+      - name: Base de contratos do PNCP (feita pelo workflow pncp.yml)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download pncp-dados -p contratos.parquet -D data/pncp || echo "sem base do PNCP; páginas buscam pelo navegador"
+
+      - name: Rodar ETL
+        run: python -m etl.build
+
+      - name: Guardar relatório de qualidade
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualidade
+          path: data/out/qualidade.json
+
+      - name: Publicar PRÉVIA (branch ongs) no Cloudflare Pages
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: npx --yes wrangler@4 pages deploy site --project-name=painel-emendas --branch=previa-ongs --commit-dirty=true
