@@ -4,30 +4,16 @@ jobs:
   sondar:
     runs-on: ubuntu-latest
     steps:
-      - name: Transferegov (api-publica)
+      - name: Portal da Transparência (convênios, CEPIM) pela data publicada na página
         continue-on-error: true
         run: |
           set +e
-          B=https://api-publica.transferegov.gestao.gov.br/downloads/dadosgov
-          curl -sL -m 60 -A "Mozilla/5.0" "$B/" -w "\nHTTP %{http_code}\n" | head -c 4000; echo
-          for f in data_carga_siconv.txt siconv_proponentes.csv.zip siconv_proposta.csv.zip siconv_convenio.csv.zip siconv.zip; do
-            curl -sIL -m 60 -A "Mozilla/5.0" "$B/$f" | grep -iE '^HTTP|length|modified'; done
-          curl -sL -m 600 -A "Mozilla/5.0" "$B/siconv_proposta.csv.zip" -o p.zip -w "HTTP %{http_code} %{size_download}\n"; unzip -l p.zip; unzip -p p.zip | head -3
-          curl -sL -m 600 -A "Mozilla/5.0" "$B/siconv_convenio.csv.zip" -o c.zip -w "HTTP %{http_code} %{size_download}\n"; unzip -l c.zip; unzip -p c.zip | head -3
-          unzip -p p.zip | wc -l; unzip -p p.zip | cut -d';' -f1-40 | grep -ci "sem fins\|privada" 
-      - name: Portal da Transparência (convênios, CEPIM)
-        continue-on-error: true
-        run: |
-          set +e
-          for u in convenios/UNICO convenios/202610 convenios/20261031 cepim/UNICO cepim/20261114 cepim/202611; do
-            curl -sL -m 300 -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/$u" -o x.zip -w "$u HTTP %{http_code} %{content_type} %{size_download}\n"
-            unzip -l x.zip 2>/dev/null | head -5; for f in $(unzip -Z1 x.zip 2>/dev/null); do unzip -p x.zip "$f" | head -2 | iconv -f latin1 -t utf8; done; done
-          curl -sL -m 60 -A "Mozilla/5.0" https://portaldatransparencia.gov.br/download-de-dados/convenios | grep -oiE '(arquivos|UNICO|formato|ultimoAno|anos|meses|dias)[^<]{0,200}' | head -20
-      - name: IATI (d-portal) XML com organizações participantes
-        continue-on-error: true
-        run: |
-          set +e
-          curl -s -m 120 "https://d-portal.org/q.xml?from=act,country&country_code=BR&limit=2" | head -c 6000; echo
-          curl -s -m 120 "https://d-portal.org/q.xml?from=act,country&country_code=BR&limit=10000" -o br.xml -w "HTTP %{http_code} %{size_download} %{time_total}\n"
-          grep -c "<iati-activity" br.xml; grep -o 'participating-org[^>]*ref="BR-[^"]*"' br.xml | head -20; grep -c 'BR-CNPJ' br.xml
-          grep -o '<receiver-org[^>]*>' br.xml | sort | uniq -c | sort -rn | head -20
+          for o in convenios cepim; do
+            P=$(curl -sL -m 60 -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/$o")
+            echo "$P" | grep -oE 'arquivos.push\(\{[^}]*\}' | tail -3
+            D=$(echo "$P" | grep -oE '"ano" : "[0-9]{4}", "mes" : "[0-9]{2}", "dia" : "[0-9]{2}"' | tail -1 | grep -oE '[0-9]+' | tr -d '\n')
+            echo "$o -> $D"
+            curl -sL -m 600 -A "Mozilla/5.0" "https://portaldatransparencia.gov.br/download-de-dados/$o/$D" -o x.zip -w "HTTP %{http_code} %{content_type} %{size_download}\n"
+            unzip -l x.zip; for f in $(unzip -Z1 x.zip); do echo "== $f"; unzip -p x.zip "$f" | head -3 | iconv -f latin1 -t utf8; unzip -p x.zip "$f" | wc -l; done
+            if [ $o = convenios ]; then f=$(unzip -Z1 x.zip | head -1); unzip -p x.zip "$f" | iconv -f latin1 -t utf8 | awk -F';' 'NR>1{print $20}' | sort | uniq -c | sort -rn | head -15; fi
+          done
