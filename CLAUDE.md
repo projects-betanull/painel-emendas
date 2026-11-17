@@ -10,6 +10,7 @@ Site público (https://painel-emendas.pages.dev) que mostra quanto cada municíp
 - `etl/site_static/`: CSS, `motor.js` (pivô compartilhado), `explorar/`, `painel/`, `gestao/`, `ia/`.
 - `lib/mcp.js` + `functions/mcp.js`: servidor MCP (Streamable HTTP) em /mcp. Grátis: buscar_municipio, resumo_municipio. Pago (passe 24 h, 1000 sats): detalhes e ranking. Fatura via LNURL do endereço Lightning; conferência pela API pública de faturas do coinos; token HMAC com TOKEN_SECRET.
 - `functions/api/passe.js` + `etl/site_static/passe.js`: compra do passe no navegador (fatura, QR via qrcode.js baixado do unpkg no build, conferência a cada 3 s, token no localStorage; o token do MCP também vale).
+- `functions/og/[[caminho]].js` + `lib/og.js`: cartão de prévia (Open Graph, PNG 1200x630) em /og/<chave>.png, desenhado sob demanda e guardado no cache da Cloudflare; chave = `site`, UF (`sp`) ou UF-código IBGE (`sp-3509502`). Textos em `/og-dados/<uf>.json` (ETL, um arquivo por UF para não estourar o limite de 20 mil arquivos do Pages). Glifos da fonte Inter pré-rasterizados em `lib/og_fonte.js` (gerado por `tools/og_fonte.py`; rodar de novo só se mudar fonte, tamanho ou caracteres).
 - `functions/api/gestao.js`: dados da página /gestao/, exige cabeçalho X-Admin-Key = ADMIN_KEY.
 - `functions/api/_middleware.js`: bloqueia acesso direto a /api/m e /api/ranking (só o MCP lê, via env.ASSETS).
 - `server.json` + `.github/workflows/mcp-registry.yml`: publicação no registro oficial de MCP (OIDC). Suba a versão em server.json a cada mudança relevante do MCP.

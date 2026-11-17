@@ -275,3 +275,19 @@ def test_site_com_contratos_prontos(tmp_path, monkeypatch):
     assert "FORN 11222333000181" in campinas and "R$ 3.000" in campinas and "contratos.js" not in campinas
     api = json.loads((site / "api" / "m" / "3509502.json").read_text(encoding="utf-8"))
     assert api["contratos"]["total_contratos"] == 2
+
+
+def test_cartao_og(tmp_path):
+    import subprocess
+
+    site = tmp_path / "site"
+    build.main(["--sem-baixar", "--raw", str(FIX), "--out", str(tmp_path / "out"), "--site", str(site), "--ano-inicial", "2020"])
+    pag = (site / "municipio" / "campinas-sp" / "index.html").read_text(encoding="utf-8")
+    assert '/og/sp-3509502.png?v=' in pag and 'summary_large_image' in pag
+    assert '/og/site.png?v=' in (site / "index.html").read_text(encoding="utf-8")
+    assert '/og/sp.png?v=' in (site / "uf" / "sp" / "index.html").read_text(encoding="utf-8")
+    sp = json.loads((site / "og-dados" / "sp.json").read_text(encoding="utf-8"))
+    assert sp["3509502"]["titulo"] == "Campinas" and sp["3509502"]["valor"].startswith("R$") and "uf" in sp
+    raiz = Path(__file__).parent.parent
+    r = subprocess.run(["node", str(raiz / "tests" / "test_og.mjs"), str(site)], capture_output=True, text=True)
+    assert r.returncode == 0 and "og ok" in r.stdout, r.stdout + r.stderr

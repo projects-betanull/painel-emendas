@@ -112,7 +112,14 @@ def mascarar_documento(cod: str) -> str:
 # --------------------------------------------------------------------------- layout
 
 
-def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2014", url: str = "", extra_head: str = "") -> str:
+def url_cartao(chave: str, atualizado: str) -> str:
+    """Imagem de prévia (Open Graph) desenhada sob demanda por functions/og/; ?v= muda a cada atualização dos dados."""
+    versao = re.sub(r"\D", "", atualizado)
+    return f"{config.SITE_URL}/og/{chave}.png?v={versao}"
+
+
+def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2014", url: str = "", extra_head: str = "",
+           cartao: str = "site") -> str:
     og_url = ""
     if url is not None:
         completo = e(config.SITE_URL + "/" + url)
@@ -133,7 +140,12 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="{NOME_SITE}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="{e(url_cartao(cartao, atualizado))}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{e(descricao)}">
+<meta name="twitter:card" content="summary_large_image">
 {og_url}
 {extra_head}<link rel="icon" href="{raiz}icone.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{raiz}estilo.css">
@@ -343,6 +355,11 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
     def nome_uf(uf: str) -> str:
         return UFS.get(uf, uf)
 
+    # Textos dos cartões de prévia (og/), um arquivo por UF: a imagem é desenhada sob demanda em functions/og/,
+    # então o deploy ganha só ~28 arquivos em vez de um PNG por município (limite de 20 mil do Pages).
+    cartoes: dict[str, dict] = {}
+    rodape_cartao = f"{config.SITE_URL.split('://')[-1]} · Fonte: Portal da Transparência (CGU) · {atualizado}"
+
     # ---- páginas de município
     for codigo, total in totais.items():
         if codigo not in nomes:
@@ -358,14 +375,14 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 
         # Frase-resumo e comparação por habitante.
         resumo = [f"<strong>{brl(total)}</strong> recebidos em emendas parlamentares de {desde} até hoje."]
+        comp = ""
         if pd.notna(b["per_capita"]):
             med = mediana_uf.get(uf)
-            comp = ""
             if med and pd.notna(med) and med > 0:
                 r = b["per_capita"] / med
-                comp = (f", {r:.1f}".replace(".", ",") + f" vezes a mediana dos municípios de {e(uf)}") if r >= 1.15 else \
-                       (f", abaixo da mediana de {e(uf)} ({brl(med)})" if r <= 0.85 else f", perto da mediana de {e(uf)}")
-            resumo.append(f"Isso dá <strong>{brl(b['per_capita'])} por habitante</strong>{comp}.")
+                comp = (f", {r:.1f}".replace(".", ",") + f" vezes a mediana dos municípios de {uf}") if r >= 1.15 else \
+                       (f", abaixo da mediana de {uf} ({brl(med)})" if r <= 0.85 else f", perto da mediana de {uf}")
+            resumo.append(f"Isso dá <strong>{brl(b['per_capita'])} por habitante</strong>{e(comp)}.")
         if len(top_area) and top_area.index[0] != "Não informada":
             resumo.append(f"A maior parte foi para <strong>{e(top_area.index[0].lower())}</strong> ({pct(100 * top_area.iloc[0] / total)}).")
         if len(top_aut):
@@ -393,12 +410,25 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
             dataset_ld(f"Emendas parlamentares recebidas em {nome} ({uf})", desc_pag, rel, desde, f"{nome}, {nome_uf(uf)}, Brasil", hoje_iso),
         )
         url_pagina = f"{config.SITE_URL}/{rel}"
-        texto_wpp = f"{nome} ({uf}) recebeu {brl_curto(total)} em emendas parlamentares desde {desde}. Veja quem mandou e quem recebeu: {url_pagina}"
+        posicao = f"{int(b['rank_uf'])}º de {int(qtd_uf[uf])} município{'s' if qtd_uf[uf] > 1 else ''} de {uf}"
+        extra_wpp = f", {brl(b['per_capita'])} por habitante" if pd.notna(b["per_capita"]) else ""
+        texto_wpp = (f"{nome} ({uf}) recebeu {brl_curto(total)} em emendas parlamentares desde {desde}{extra_wpp} "
+                     f"({posicao} em valor recebido). Veja quem mandou e quem recebeu: {url_pagina}")
+        chave = f"{uf.lower()}-{codigo}"
+        cartoes.setdefault(uf, {})[codigo] = {
+            "titulo": nome,
+            "sub": posicao + (f" · {inteiro(b['pop'])} habitantes" if pd.notna(b["pop"]) else ""),
+            "valor": brl_curto(total),
+            "linha1": f"recebidos em emendas parlamentares desde {desde}",
+            "linha2": (f"{brl(b['per_capita'])} por habitante{comp.replace(' dos municípios', '')}" if pd.notna(b["per_capita"])
+                       else (f"Quem mais enviou: {top_aut.index[0]}" if len(top_aut) else "")),
+            "rodape": rodape_cartao,
+        }
         rotulo_m = f"{nome} ({uf})"
         corpo = f"""
 <p class="migalha"><a href="../../">Início</a> › <a href="../../{caminho_uf(uf)}">{e(nome_uf(uf))}</a> › {e(nome)}</p>
 <h1>{e(nome)} <span class="uf">{e(uf)}</span></h1>
-<p class="contexto">{int(b['rank_uf'])}º de {int(qtd_uf[uf])} municípios de {e(uf)} em valor recebido{hab}</p>
+<p class="contexto">{e(posicao)} em valor recebido{hab}</p>
 <p class="resumo-texto">{' '.join(resumo)}</p>
 <p class="acoes"><a class="botao-wpp" href="https://wa.me/?text={quote(texto_wpp)}" rel="noopener">Compartilhar no WhatsApp</a>
 <a class="botao2" href="../../painel/#f.municipio={quote(rotulo_m)}">Ver no painel</a>
@@ -425,7 +455,7 @@ Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de eme
         pasta = destino / rel
         pasta.mkdir(parents=True, exist_ok=True)
         (pasta / "index.html").write_text(
-            pagina(titulo_pag, desc_pag, corpo, "../../", atualizado, desde, rel, dados_ld),
+            pagina(titulo_pag, desc_pag, corpo, "../../", atualizado, desde, rel, dados_ld, cartao=chave),
             encoding="utf-8",
         )
 
@@ -443,6 +473,17 @@ Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de eme
             resumo.append(f"A mediana entre os municípios é de <strong>{brl(med)} por habitante</strong>.")
         linhas = [[f"{int(base.at[c, 'rank_uf'])}º", f'<a href="../../{caminho_municipio(*nomes[c])}">{e(nomes[c][0])}</a>', brl(totais[c]),
                    brl(base.at[c, "per_capita"]) if pd.notna(base.at[c, "per_capita"]) else "–"] for c in fila]
+        cartoes.setdefault(uf, {})["uf"] = {
+            "titulo": nu,
+            "sub": qtd_mun + (f" · mediana de {brl(med)} por habitante" if med and pd.notna(med) and len(fila) > 1 else ""),
+            "valor": brl_curto(total_uf),
+            "linha1": f"recebidos em emendas parlamentares desde {desde}",
+            "linha2": "Quem mais recebeu: " + ", ".join(nomes[c][0] for c in fila[:3]),
+            "rodape": rodape_cartao,
+        }
+        url_uf = f"{config.SITE_URL}/{rel}"
+        texto_wpp = (f"Quanto cada município de {nu} recebeu em emendas parlamentares desde {desde}: "
+                     f"{brl_curto(total_uf)} no total. Veja o seu: {url_uf}")
         titulo_pag = f"Emendas parlamentares em {nu} ({uf}): quanto cada município recebeu"
         desc_pag = (f"Quanto cada município de {nu} recebeu em emendas parlamentares desde {desde}: {qtd_mun}, "
                     f"com valor total e por habitante. Dados do Portal da Transparência.")
@@ -450,7 +491,8 @@ Confira emenda por emenda na <a href="{PORTAL_CONSULTA}">consulta oficial de eme
 <p class="migalha"><a href="../../">Início</a> › {e(nu)}</p>
 <h1>Emendas parlamentares em {e(nu)} <span class="uf">{e(uf)}</span></h1>
 <p class="resumo-texto">{' '.join(resumo)}</p>
-<p class="acoes"><a class="botao2" href="../../painel/#f.uf={quote(uf)}">Ver no painel</a>
+<p class="acoes"><a class="botao-wpp" href="https://wa.me/?text={quote(texto_wpp)}" rel="noopener">Compartilhar no WhatsApp</a>
+<a class="botao2" href="../../painel/#f.uf={quote(uf)}">Ver no painel</a>
 <a class="botao2" href="../../explorar/#l=autor&amp;c=ano&amp;f.uf={quote(uf)}">Quem mais enviou para {e(uf)}</a></p>
 <section><h2>Municípios de {e(nu)} por valor recebido</h2>
 {tabela(["Posição", "Município", "Valor recebido", "Por habitante"], linhas, {2, 3})}</section>
@@ -466,7 +508,8 @@ Confira emenda por emenda na
         (pasta / "index.html").write_text(
             pagina(titulo_pag, desc_pag, corpo, "../../", atualizado, desde, rel, json_ld(
                 migalhas_ld([("Início", ""), (nu, rel)]),
-                dataset_ld(f"Emendas parlamentares recebidas por município em {nu}", desc_pag, rel, desde, f"{nu}, Brasil", hoje_iso))),
+                dataset_ld(f"Emendas parlamentares recebidas por município em {nu}", desc_pag, rel, desde, f"{nu}, Brasil", hoje_iso)),
+                cartao=uf.lower()),
             encoding="utf-8",
         )
     bloco_ufs = ""
@@ -495,6 +538,18 @@ Confira emenda por emenda na
 <p class="dica">Entre municípios com mais de {inteiro(POP_MIN_DESTAQUE)} habitantes.</p>
 {tabela(["Município", "UF", "Por habitante"], [linha_mun(c, brl(r["per_capita"])) for c, r in por_hab.iterrows() if c in nomes], {2})}</section>"""
     total_geral = float(df["valor_recebido"].sum())
+    pasta_og = destino / "og-dados"
+    pasta_og.mkdir(exist_ok=True)
+    for uf, dados in cartoes.items():
+        (pasta_og / f"{uf.lower()}.json").write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    (pasta_og / "site.json").write_text(json.dumps({
+        "titulo": "Emendas parlamentares por município",
+        "sub": "Quanto cada cidade recebeu, de quem e para quem",
+        "valor": brl_curto(total_geral),
+        "linha1": f"pagos a {inteiro(len(totais))} municípios desde {desde}",
+        "linha2": "Busque o seu município e compartilhe",
+        "rodape": rodape_cartao,
+    }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     corpo = f"""
 <section class="hero">
 <h1>Quanto o seu município recebeu em emendas parlamentares?</h1>
