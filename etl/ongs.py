@@ -337,36 +337,10 @@ def ler_iati(fonte) -> pd.DataFrame:
         el.clear()
     cols = ["aid", "doador", "titulo", "ano_inicio", "ano_fim", "ref", "nome", "tipo", "papel", "valor", "moeda"]
     df = pd.DataFrame(linhas, columns=cols)
-    ref = df["ref"].str.upper()
-    df["cnpj8_ref"] = ref.where(ref.str.startswith("BR-CNPJ"), "").map(cnpj8)
-    df["chave_nome"] = df["nome"].map(chave_nome)
     return df
 
 
 # --------------------------------------------------------------------------- junção
-
-NOME_MIN_LIGACAO = 15  # nomes curtos (siglas) não servem para ligar doador estrangeiro a CNPJ
-
-
-def ligar_iati(iati: pd.DataFrame, org: pd.DataFrame) -> pd.DataFrame:
-    """Liga cada organização citada pelo doador a um CNPJ: pelo CNPJ informado (BR-CNPJ-...) ou,
-    na falta dele, pelo nome idêntico à razão social ou ao nome fantasia de UMA única OSC."""
-    if iati is None or iati.empty:
-        return pd.DataFrame(columns=list(getattr(iati, "columns", [])) + ["cnpj8", "ligacao"])
-    nomes: dict[str, set[str]] = {}
-    for c8, nome, fantasia in zip(org.index, org["nome"], org["fantasia"]):
-        for n in {chave_nome(nome), chave_nome(fantasia)}:
-            if len(n) >= NOME_MIN_LIGACAO:
-                nomes.setdefault(n, set()).add(c8)
-    unicos = {n: next(iter(c)) for n, c in nomes.items() if len(c) == 1}
-    df = iati.copy()
-    por_ref = df["cnpj8_ref"].where(df["cnpj8_ref"].isin(org.index), "")
-    por_nome = df["chave_nome"].map(unicos).fillna("")
-    df["cnpj8"] = por_ref.where(por_ref.ne(""), por_nome)
-    df["ligacao"] = ["CNPJ informado pelo doador" if r else ("nome igual ao do cadastro" if n else "")
-                     for r, n in zip(por_ref, por_nome)]
-    return df
-
 
 def _registros(df: pd.DataFrame, colunas: list[str], n: int, ordem: str) -> list[list]:
     if df.empty:
@@ -376,9 +350,13 @@ def _registros(df: pd.DataFrame, colunas: list[str], n: int, ordem: str) -> list
             for linha in t.itertuples(index=False)]
 
 
-def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | None, iati: pd.DataFrame | None,
+def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | None,
            cepim: pd.DataFrame | None, internacionais: dict[str, str]) -> tuple[pd.DataFrame, dict[str, dict]]:
-    """Resumo por organização (para listas e rankings) e ficha completa de cada uma (para a página)."""
+    """Resumo por organização (para listas e rankings) e ficha completa de cada uma (para a página).
+
+    Só entram vínculos por CNPJ vindos de fonte oficial (CGU, IPEA/Receita). Projetos de doadores
+    estrangeiros (IATI) NÃO são ligados a nenhuma OSC: ficam numa lista à parte (ver gravar_internacional).
+    """
     org = org.copy()
     idx = org.index
     vazio = pd.Series(0.0, index=idx)
@@ -395,12 +373,6 @@ def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | Non
     org["convenios_liberado"] = cv.groupby("cnpj8")["liberado"].sum().reindex(idx).fillna(0.0) if len(cv) else vazio
     org["n_convenios"] = cv.groupby("cnpj8").size().reindex(idx).fillna(0).astype(int) if len(cv) else 0
 
-    ia = ligar_iati(iati, org) if iati is not None else pd.DataFrame()
-    ia = ia[ia["cnpj8"].ne("")] if len(ia) else ia
-    org["iati_atividades"] = ia.groupby("cnpj8")["aid"].nunique().reindex(idx).fillna(0).astype(int) if len(ia) else 0
-    org["iati_doadores"] = (ia.groupby("cnpj8")["doador"].agg(lambda s: sorted(set(s))).reindex(idx) if len(ia)
-                            else pd.Series([None] * len(idx), index=idx))
-
     ce = cepim[cepim["cnpj8"].isin(idx)] if cepim is not None and len(cepim) else pd.DataFrame()
     org["cepim"] = ce.groupby("cnpj8").size().reindex(idx).fillna(0).astype(int) if len(ce) else 0
     org["pais_estrangeiro"] = [internacionais.get(c) or ("exterior" if n in NATUREZAS_ESTRANGEIRAS else "")
@@ -410,7 +382,6 @@ def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | Non
     fichas: dict[str, dict] = {}
     em_g = dict(tuple(em.groupby("cnpj8"))) if len(em) else {}
     cv_g = dict(tuple(cv.groupby("cnpj8"))) if len(cv) else {}
-    ia_g = dict(tuple(ia.groupby("cnpj8"))) if len(ia) else {}
     ce_g = dict(tuple(ce.groupby("cnpj8"))) if len(ce) else {}
     for c8, o in org.iterrows():
         f = {
@@ -439,9 +410,6 @@ def montar(org: pd.DataFrame, fav: pd.DataFrame | None, conv: pd.DataFrame | Non
             }
             for l in f["convenios"]["lista"]:
                 l[4] = (l[4] or "")[:220]
-        if c8 in ia_g:
-            i = ia_g[c8].sort_values("valor", ascending=False).drop_duplicates("aid")
-            f["internacional"] = _registros(i, ["doador", "titulo", "ano_inicio", "ano_fim", "papel", "valor", "moeda", "aid", "nome", "ligacao"], 40, "valor")
         if c8 in ce_g:
             f["cepim"] = _registros(ce_g[c8].assign(o=0), ["convenio", "orgao", "motivo"], 20, "o")
         fichas[c8] = f
@@ -457,19 +425,20 @@ def _json(caminho: Path, dados) -> None:
 
 
 def bandeiras(o) -> int:
-    """Bits para filtros no navegador: 1 emendas, 2 convênios, 4 internacional, 8 CEPIM, 16 estrangeira, 32 inativa."""
-    return ((o.emendas > 0) * 1 | (o.n_convenios > 0) * 2 | (o.iati_atividades > 0) * 4 | (o.cepim > 0) * 8
+    """Bits para filtros no navegador: 1 emendas, 2 convênios, 8 CEPIM, 16 estrangeira, 32 inativa (4 não é usado)."""
+    return ((o.emendas > 0) * 1 | (o.n_convenios > 0) * 2 | (o.cepim > 0) * 8
             | bool(o.pais_estrangeiro) * 16 | (not o.ativa) * 32)
 
 
-def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado: str, fontes: dict[str, str]) -> dict:
+def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado: str, fontes: dict[str, str],
+           iati: pd.DataFrame | None = None) -> dict:
     """Grava /ongs/: fichas em 1.000 arquivos (pelos 3 primeiros dígitos do CNPJ), lista por UF e destaques."""
     from .site import UFS, brl, e, inteiro, json_ld, pagina, tabela
 
     pasta = destino / "ongs"
     pasta.mkdir(parents=True, exist_ok=True)
     # Fichas: só organizações ativas ou que tenham algum dado de dinheiro/impedimento.
-    relevantes = org[org["ativa"] | (org["federal"] > 0) | (org["iati_atividades"] > 0) | (org["cepim"] > 0)]
+    relevantes = org[org["ativa"] | (org["federal"] > 0) | (org["cepim"] > 0) | (org["pais_estrangeiro"] != "")]
     lotes: dict[str, dict] = {}
     for c8 in relevantes.index:
         lotes.setdefault(c8[:3], {})[c8] = fichas[c8]
@@ -482,8 +451,8 @@ def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado
             g = g.sort_values("federal", ascending=False)
             _json(pasta / "l" / f"{uf}.json", [[c, n, m, int(b), round(float(v))] for c, n, m, b, v
                                               in zip(g.index, g["nome"], g["municipio"], g["bits"], g["federal"])])
-    # Destaques nacionais: quem tem dinheiro federal, internacional ou impedimento (busca rápida, sem escolher UF).
-    dest = rel[(rel["bits"] & 15) > 0].sort_values("federal", ascending=False)
+    # Destaques nacionais: quem tem dinheiro federal, impedimento ou é estrangeira (busca rápida, sem escolher UF).
+    dest = rel[(rel["bits"] & 27) > 0].sort_values("federal", ascending=False)
     _json(pasta / "destaques.json", [[c, n, u, m, int(b), round(float(v))] for c, n, u, m, b, v
                                      in zip(dest.index, dest["nome"], dest["uf"], dest["municipio"], dest["bits"], dest["federal"])])
 
@@ -492,7 +461,7 @@ def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado
         "atualizado": atualizado, "oscs": int(len(org)), "ativas": int(len(ativas)),
         "com_emendas": int((org["emendas"] > 0).sum()), "emendas": round(float(org["emendas"].sum()), 2),
         "com_convenios": int((org["n_convenios"] > 0).sum()), "convenios_liberado": round(float(org["convenios_liberado"].sum()), 2),
-        "com_internacional": int((org["iati_atividades"] > 0).sum()), "estrangeiras": int((org["pais_estrangeiro"] != "").sum()),
+        "estrangeiras": int((org["pais_estrangeiro"] != "").sum()),
         "cepim": int((org["cepim"] > 0).sum()), "fichas": int(len(relevantes)), "arquivos_fichas": len(lotes),
     }
     _json(pasta / "resumo.json", resumo)
@@ -504,10 +473,7 @@ def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado
         t = org[org[col] > 0].sort_values(col, ascending=False).head(n)
         return tabela(["Organização", "UF", "Valor"], [[link(c, o["nome"]), e(o["uf"]), brl(o[col])] for c, o in t.iterrows()], {2})
 
-    intl = org[org["iati_atividades"] > 0].sort_values("iati_atividades", ascending=False).head(25)
-    tab_intl = tabela(["Organização", "UF", "Projetos", "Doadores (como declarados)"],
-                      [[link(c, o["nome"]), e(o["uf"]), inteiro(o["iati_atividades"]), e(", ".join((o["iati_doadores"] or [])[:3]))]
-                       for c, o in intl.iterrows()], {2})
+    resumo.update(gravar_internacional(iati, pasta, atualizado))
     por_uf = ativas.groupby("uf").agg(oscs=("nome", "size"), emendas=("emendas", "sum"), conv=("convenios_liberado", "sum"))
     tab_uf = tabela(["UF", "OSCs ativas", "Emendas recebidas", "Convênios (liberado)"],
                     [[f'<a href="#uf={u}" data-uf="{u}">{e(UFS.get(u, u))}</a>', inteiro(r.oscs), brl(r.emendas), brl(r.conv)]
@@ -519,15 +485,16 @@ def gravar(org: pd.DataFrame, fichas: dict[str, dict], destino: Path, atualizado
 <p class="migalha"><a href="../">Início</a> › ONGs</p>
 <h1>Transparência das ONGs</h1>
 <p class="destaque">O Brasil tem <strong>{inteiro(resumo["ativas"])}</strong> organizações da sociedade civil ativas.
-Aqui você vê, para cada uma, quanto recebeu do governo federal (emendas parlamentares e convênios), quais doadores
-estrangeiros declaram financiá-la e onde ela atua.</p>
+Aqui você vê, para cada uma, quanto recebeu do governo federal (emendas parlamentares e convênios), onde ela atua
+e se está impedida de receber recursos. O dinheiro que doadores estrangeiros declaram enviar ao Brasil está numa
+<a href="internacional/">lista à parte</a>.</p>
 <section class="busca-ongs">
 <label for="q">Buscar por nome, CNPJ ou cidade</label>
 <input id="q" type="search" autocomplete="off" placeholder="Ex.: APAE, Instituto Socioambiental, 12.345.678">
 <div class="controles">
 <label>Estado<select id="uf"><option value="">Só as que receberam dinheiro (Brasil)</option>{"".join(f'<option value="{u}">{e(n)} (todas)</option>' for u, n in sorted(UFS.items(), key=lambda x: x[1]))}</select></label>
 <label>Mostrar<select id="filtro"><option value="0">Todas</option><option value="1">Com emendas</option><option value="2">Com convênios</option>
-<option value="4">Com financiamento internacional declarado</option><option value="16">Estrangeiras</option><option value="8">Impedidas (CEPIM)</option></select></label>
+<option value="16">Estrangeiras</option><option value="8">Impedidas (CEPIM)</option></select></label>
 </div>
 <p id="contagem" class="dica"></p>
 <ul id="res" class="resultados"></ul>
@@ -536,7 +503,7 @@ estrangeiros declaram financiá-la e onde ela atua.</p>
 <section class="kpis">
 <div class="kpi"><strong>{inteiro(resumo["com_emendas"])}</strong><span>OSCs receberam emendas · {brl(resumo["emendas"])}</span></div>
 <div class="kpi"><strong>{inteiro(resumo["com_convenios"])}</strong><span>têm convênios federais · {brl(resumo["convenios_liberado"])} liberados</span></div>
-<div class="kpi"><strong>{inteiro(resumo["com_internacional"])}</strong><span>aparecem em projetos de doadores estrangeiros</span></div>
+<div class="kpi"><strong>{inteiro(resumo["iati_projetos"])}</strong><span>projetos de doadores estrangeiros no Brasil (<a href="internacional/">lista à parte</a>)</span></div>
 <div class="kpi"><strong>{inteiro(resumo["estrangeiras"])}</strong><span>são filiais de organizações estrangeiras</span></div>
 <div class="kpi"><strong>{inteiro(resumo["cepim"])}</strong><span>estão impedidas de receber recursos (CEPIM)</span></div>
 </section>
@@ -545,8 +512,9 @@ estrangeiros declaram financiá-la e onde ela atua.</p>
 <section><h2>Quem mais recebeu em emendas parlamentares</h2>{top("emendas")}
 <p class="dica">Parte das emendas é paga por meio de convênio. Por isso os dois valores não devem ser somados.</p></section>
 <section><h2>Financiamento internacional declarado pelos doadores</h2>
-<p>Organizações brasileiras citadas como executoras ou recebedoras em projetos que governos e fundações estrangeiras
-publicam no padrão internacional IATI.</p>{tab_intl}</section>
+<p>Governos e fundações estrangeiras publicam no padrão internacional IATI os projetos que financiam no Brasil e o nome de
+quem executa ou recebe. Esses dados <strong>não têm confirmação oficial brasileira</strong>, por isso não são ligados a
+nenhuma ONG deste cadastro: ficam numa <a href="internacional/">lista à parte</a>, com o nome escrito exatamente como o doador publicou.</p></section>
 <section><h2>Por estado</h2>{tab_uf}</section>
 <section><h2>Por área de atuação</h2>{tab_area}</section>
 
@@ -557,13 +525,13 @@ publicam no padrão internacional IATI.</p>{tab_intl}</section>
 <li><strong>Convênios, termos de fomento e de colaboração</strong>: <a href="{PORTAL_DOWNLOAD}/convenios">Portal da Transparência (CGU)</a>, pelo CNPJ do convenente. Arquivo de {e(fontes.get("convenios", ""))}.</li>
 <li><strong>Impedimentos</strong>: <a href="{PORTAL_DOWNLOAD}/cepim">CEPIM (CGU)</a>, entidades impedidas de receber transferências federais. Arquivo de {e(fontes.get("cepim", ""))}.</li>
 <li><strong>Financiamento internacional</strong>: projetos com destino ao Brasil publicados pelos próprios doadores no padrão
-<a href="https://iatistandard.org/pt/">IATI</a>, lidos pelo <a href="{IATI_PAGINA}">d-portal</a>.</li>
+<a href="https://iatistandard.org/pt/">IATI</a>, lidos pelo <a href="{IATI_PAGINA}">d-portal</a>. Mostrados à parte, sem ligação com o cadastro.</li>
 <li><strong>Organizações estrangeiras</strong>: natureza jurídica 320-4/321-2 da Receita e a <a href="{MOSC_PAGINA}">checagem do IPEA</a>.</li>
 </ul>
 <p><strong>O que não está aqui.</strong> Não existe no Brasil um registro oficial único do dinheiro que vem do exterior para ONGs.
-O IATI só mostra o que cada doador escolhe publicar; muitas fundações privadas e governos não publicam, e boa parte dos
-doadores não informa o CNPJ de quem recebe. Quando o doador não informa o CNPJ, a ligação é feita só se o nome for idêntico
-ao de uma única OSC do cadastro, e a ficha avisa isso. Dinheiro de estados e municípios, isenções fiscais e
+O IATI só mostra o que cada doador escolhe publicar; muitas fundações privadas e governos não publicam, e quase nenhum
+doador informa o CNPJ de quem recebe. Como não há confirmação oficial, este site <strong>não liga</strong> esses projetos a
+nenhuma ONG: as fichas só trazem vínculos por CNPJ vindos de fontes do governo (CGU, Receita Federal e IPEA). Dinheiro de estados e municípios, isenções fiscais e
 doações de empresas e pessoas também não estão aqui.</p>
 <p>Os valores são reproduzidos como publicados pelas fontes e não constituem juízo sobre a legalidade de nenhum repasse
 ou sobre a atuação de nenhuma organização. Encontrou um erro? <a href="https://github.com/projects-betanull/painel-emendas/issues">Avise aqui</a>.</p>
@@ -572,11 +540,11 @@ ou sobre a atuação de nenhuma organização. Encontrou um erro? <a href="https
 """
     (pasta / "index.html").write_text(
         pagina("Transparência das ONGs: dinheiro público e estrangeiro de cada organização",
-               "Quanto cada ONG do Brasil recebeu em emendas parlamentares e convênios federais, quais doadores estrangeiros "
-               "declaram financiá-la e onde atua. Todas as OSCs do país, com fonte oficial.", corpo, "../", atualizado,
+               "Quanto cada ONG do Brasil recebeu em emendas parlamentares e convênios federais, onde atua e se está impedida. "
+               "Projetos de doadores estrangeiros no Brasil, como declarados. Todas as OSCs do país, com fonte oficial.", corpo, "../", atualizado,
                url="ongs/", extra_head=json_ld({"@context": "https://schema.org", "@type": "Dataset",
                    "name": "Transparência das organizações da sociedade civil do Brasil",
-                   "description": "Cadastro das OSCs (IPEA) ligado a emendas, convênios federais, CEPIM e projetos internacionais (IATI).",
+                   "description": "Cadastro das OSCs (IPEA) ligado pelo CNPJ a emendas, convênios federais e CEPIM; projetos de doadores estrangeiros (IATI) à parte.",
                    "url": "https://painel-emendas.pages.dev/ongs/", "inLanguage": "pt-BR", "isAccessibleForFree": True})),
         encoding="utf-8")
     mapa = destino / "sitemap.xml"
@@ -585,6 +553,51 @@ ou sobre a atuação de nenhuma organização. Encontrou um erro? <a href="https
         mapa.write_text(mapa.read_text(encoding="utf-8").replace("</urlset>", loc + "</urlset>"), encoding="utf-8")
     print(f"ongs: {resumo}")
     return resumo
+
+
+def gravar_internacional(iati: pd.DataFrame | None, pasta: Path, atualizado: str) -> dict:
+    """Página /ongs/internacional/: projetos IATI no Brasil e organizações citadas, com o nome como o doador escreveu.
+
+    Nenhuma linha é ligada a CNPJ ou a ficha do cadastro: a fonte é a declaração do doador, sem confirmação oficial.
+    """
+    from .site import e, inteiro, pagina
+
+    if iati is None or iati.empty:
+        return {"iati_projetos": 0, "iati_linhas": 0}
+    # Só organizações que o doador classifica como ONG (tipos IATI 21–24), executoras ou recebedoras.
+    df = iati[iati["tipo"].isin(IATI_TIPOS_ONG) & iati["nome"].ne("")].copy()
+    df = df.sort_values("valor", ascending=False).drop_duplicates(["aid", "nome"])
+    linhas = [[r.doador, r.titulo, r.ano_inicio, r.ano_fim, r.nome, r.papel, round(float(r.valor)), r.moeda, r.aid]
+              for r in df.itertuples()]
+    _json(pasta / "internacional" / "projetos.json", linhas)
+    n_proj = int(iati["aid"].nunique())
+    corpo = f"""
+<p class="migalha"><a href="../../">Início</a> › <a href="../">ONGs</a> › Internacional</p>
+<h1>Projetos de doadores estrangeiros no Brasil</h1>
+<p class="destaque">{inteiro(n_proj)} projetos com destino ao Brasil publicados pelos próprios doadores no padrão internacional
+<a href="https://iatistandard.org/pt/">IATI</a>. Abaixo, as organizações que eles classificam como ONG e citam como executoras
+ou recebedoras: {inteiro(len(linhas))} citações.</p>
+<aside class="origem"><strong>Por que estes nomes não são ligados a nenhuma ONG do cadastro.</strong> Os nomes aparecem exatamente como
+o doador os escreveu, e quase nenhum doador informa o CNPJ. Não há registro oficial brasileiro que confirme esses repasses,
+então este site <strong>não vincula</strong> nenhuma linha desta lista a um CNPJ ou a uma ficha de ONG. Nomes parecidos ou iguais
+podem ser de organizações diferentes. Para conferir, abra o projeto no d-portal e a documentação publicada pelo doador.</aside>
+<section class="busca-ongs">
+<label for="q">Filtrar por doador, projeto ou organização</label>
+<input id="q" type="search" autocomplete="off" placeholder="Ex.: Norad, Amazônia, saúde">
+<p id="contagem" class="dica"></p>
+<div id="res"></div>
+</section>
+<p class="origem">Fonte: dados publicados pelos doadores no padrão IATI, lidos pelo <a href="{IATI_PAGINA}">d-portal</a>, consulta em
+{e(atualizado)}. Valores na moeda declarada pelo doador; zero quando ele não informa quanto repassou à organização.
+Reproduzidos como publicados, sem juízo sobre legalidade.</p>
+<script src="internacional.js" defer></script>
+"""
+    (pasta / "internacional" / "index.html").write_text(
+        pagina("Projetos de doadores estrangeiros no Brasil (IATI): organizações citadas",
+               "Projetos que governos e fundações estrangeiras declaram financiar no Brasil, com o nome das organizações "
+               "como o doador publicou. Sem vínculo com CNPJ.", corpo, "../../", atualizado, url="ongs/internacional/"),
+        encoding="utf-8")
+    return {"iati_projetos": n_proj, "iati_linhas": len(linhas)}
 
 
 def gerar(fav: pd.DataFrame | None, destino: Path, raw: Path = RAW, baixar_fontes: bool = True) -> dict | None:
@@ -611,11 +624,11 @@ def gerar(fav: pd.DataFrame | None, destino: Path, raw: Path = RAW, baixar_fonte
         cepim = opcional("cepim", ler_cepim)
         iati = opcional("iati", ler_iati)
         inter = opcional("internacionais", ler_internacionais) or {}
-        org, fichas = montar(org, fav, conv, iati, cepim, inter)
+        org, fichas = montar(org, fav, conv, cepim, inter)
         hoje = date.today().strftime("%d/%m/%Y")
         fontes = {"mosc": arqs.get("mosc_data") or "",
                   "convenios": arqs.get("convenios_data") or "", "cepim": arqs.get("cepim_data") or ""}
-        return gravar(org, fichas, destino, hoje, fontes)
+        return gravar(org, fichas, destino, hoje, fontes, iati)
     except Exception as erro:  # noqa: BLE001 - a seção nova não pode derrubar o ETL de emendas
         import traceback
 

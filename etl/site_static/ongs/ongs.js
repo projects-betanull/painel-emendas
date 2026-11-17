@@ -7,7 +7,7 @@
   const brl = (v) => v >= 1e9 ? "R$ " + (v / 1e9).toFixed(1).replace(".", ",") + " bi"
     : v >= 1e6 ? "R$ " + (v / 1e6).toFixed(1).replace(".", ",") + " mi"
     : v > 0 ? "R$ " + Math.round(v).toLocaleString("pt-BR") : "";
-  const SELOS = [[1, "emendas"], [2, "convênios"], [4, "internacional"], [16, "estrangeira"], [8, "CEPIM", true], [32, "inativa"]];
+  const SELOS = [[1, "emendas"], [2, "convênios"], [16, "estrangeira"], [8, "CEPIM", true], [32, "inativa"]];
   const cache = {};
 
   async function carregar(uf) {
@@ -32,7 +32,7 @@
     const achados = todos.filter((o) => (!bit || (o.b & bit)) &&
       (!termo || (dig.length >= 3 && o.c.startsWith(dig.slice(0, 8))) || o.k.includes(termo)));
     contagem.textContent = achados.length.toLocaleString("pt-BR") + (achados.length === 1 ? " organização" : " organizações") +
-      (uf ? " em " + ufSel.selectedOptions[0].textContent.replace(" (todas)", "") : " com dinheiro federal, internacional ou impedimento") +
+      (uf ? " em " + ufSel.selectedOptions[0].textContent.replace(" (todas)", "") : " com dinheiro federal, impedimento ou sede no exterior") +
       (achados.length > 60 ? ". Mostrando as 60 primeiras; refine a busca." : ".");
     lista.textContent = "";
     for (const o of achados.slice(0, 60)) {

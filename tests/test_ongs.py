@@ -74,28 +74,30 @@ IATI = """<iati-activities><iati-activity default-currency="EUR"><iati-identifie
 </iati-activity></iati-activities>"""
 
 
-def test_iati_e_montagem(org, tmp_path):
+def test_montagem_sem_vinculo_internacional(org, tmp_path):
     ia = ongs.ler_iati(io.BytesIO(IATI.encode()))
     assert set(ia["papel"]) == {"executora", "recebedora"} and "Governo X" not in set(ia["nome"])
     fav = pd.DataFrame({"codigo_favorecido": ["11.222.333/0001-81", "46.068.425/0001-33"], "favorecido": ["INSTITUTO AMIGOS", "MUNICIPIO"],
                         "valor_recebido": [250000.0, 9.0], "ano": [2024, 2024], "nome_autor": ["FULANO", "BELTRANO"], "uf": ["AM", "SP"]})
-    o, fichas = ongs.montar(org, fav, _conv(), ia, None, {"77888999": "Alemanha"})
+    o, fichas = ongs.montar(org, fav, _conv(), None, {"77888999": "Alemanha"})
     a = fichas["11222333"]
     assert a["emendas"]["total"] == 250000.0 and a["convenios"]["liberado"] == pytest.approx(400000.5)
     assert a["emendas"]["explorar"] == [["AM", ["INSTITUTO AMIGOS · 11.222.333/0001-81"]]]
-    assert a["internacional"][0][0] == "Agencia Doadora" and a["internacional"][0][9] == "nome igual ao do cadastro"
-    assert fichas["44555666"]["internacional"][0][9] == "CNPJ informado pelo doador"
     assert fichas["77888999"]["estrangeira"] == "Alemanha"
-    assert "ISA" not in json.dumps(fichas)  # sigla curta não liga
-    r = ongs.gravar(o, fichas, tmp_path, "17/11/2026", {})
-    assert r["com_emendas"] == 1 and r["com_internacional"] == 2
+    # Projetos estrangeiros nunca entram nas fichas, mesmo com nome idêntico ou CNPJ informado pelo doador.
+    assert not any("internacional" in f for f in fichas.values())
+    r = ongs.gravar(o, fichas, tmp_path, "17/11/2026", {}, ia)
+    assert r["com_emendas"] == 1 and r["iati_projetos"] == 1
     lote = json.loads((tmp_path / "ongs" / "d" / "112.json").read_text())
-    assert "11222333" in lote
-    assert "12121212" not in json.loads((tmp_path / "ongs" / "d" / "121.json").read_text()) if (tmp_path / "ongs" / "d" / "121.json").exists() else True
+    assert "11222333" in lote and "internacional" not in lote["11222333"]
     am = json.loads((tmp_path / "ongs" / "l" / "AM.json").read_text())
-    assert am[0][0] == "11222333" and am[0][3] & 1 and am[0][3] & 2 and am[0][3] & 4
+    assert am[0][0] == "11222333" and am[0][3] == 3
+    proj = json.loads((tmp_path / "ongs" / "internacional" / "projetos.json").read_text())
+    assert sorted(p[4] for p in proj) == ["ISA", "Instituto Amigos da Floresta Amazonica"]  # só tipo ONG; nome como o doador escreveu
+    assert not any("11222333" in json.dumps(p) or "44555666" in json.dumps(p) for p in proj)
     html = (tmp_path / "ongs" / "index.html").read_text()
-    assert "Transparência das ONGs" in html and 'o/?c=11222333' in html
+    assert 'o/?c=11222333' in html and "não liga" in html
+    assert "não vincula" in (tmp_path / "ongs" / "internacional" / "index.html").read_text()
 
 
 def test_internacionais_raiz_com_8_digitos(tmp_path):

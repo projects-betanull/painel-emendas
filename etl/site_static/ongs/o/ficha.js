@@ -35,9 +35,8 @@
     const ki = [];
     if (f.emendas) ki.push(["Emendas parlamentares recebidas", brl(f.emendas.total)]);
     if (f.convenios) ki.push(["Convênios federais: valor liberado", brl(f.convenios.liberado)]);
-    if (f.internacional) ki.push(["Projetos de doadores estrangeiros", String(new Set(f.internacional.map((l) => l[7])).size)]);
     if (ki.length) partes.push('<section class="kpis">' + ki.map(([k, v]) => '<div class="kpi"><strong>' + v + "</strong><span>" + k + "</span></div>").join("") + "</section>");
-    else partes.push("<p>Não encontramos emendas, convênios federais nem projetos de doadores estrangeiros ligados a este CNPJ nas fontes consultadas.</p>");
+    else partes.push("<p>Não encontramos emendas nem convênios federais para este CNPJ nas fontes oficiais consultadas.</p>");
 
     if (f.emendas) {
       const e = f.emendas;
@@ -58,15 +57,6 @@
           v.lista.map((l) => ['<a href="https://portaldatransparencia.gov.br/convenios/' + encodeURIComponent(l[0]) + '">' + esc(l[0]) + "</a>", esc(l[1]), esc(l[2]), esc(l[3]), esc(l[4]), esc(l[5]) + "/" + esc(l[6]), esc(l[7]), brl(l[8]), brl(l[9])]), [7, 8]) +
         (v.municipios.length ? "<p><strong>Onde executou convênios:</strong> " + v.municipios.map(esc).join(", ") + "</p>" : "") +
         '<p class="aviso-ligacao">Fonte: Portal da Transparência (CGU), convênios pelo CNPJ do convenente. Parte das emendas é paga por convênio; não some os dois valores.</p></section>');
-    }
-    if (f.internacional) {
-      partes.push("<section><h2>Financiamento internacional declarado</h2>" +
-        "<p>Projetos com destino ao Brasil em que o doador cita esta organização. Valores na moeda declarada pelo doador (zero quando ele não informa quanto repassou a ela).</p>" +
-        tabela(["Doador", "Projeto", "Anos", "Papel", "Valor declarado", "Ligação"],
-          f.internacional.map((l) => [esc(l[0]), '<a href="https://d-portal.org/ctrack.html#view=act&aid=' + encodeURIComponent(l[7]) + '">' + esc(l[1]) + "</a>",
-            esc(l[2]) + (l[3] && l[3] !== l[2] ? "–" + esc(l[3]) : ""), esc(l[4]), l[5] ? num(l[5], l[6]) : "—",
-            esc(l[9]) + (l[9] && l[9].startsWith("nome") ? " (" + esc(l[8]) + ")" : "")]), [4]) +
-        '<p class="aviso-ligacao">Fonte: dados publicados pelos próprios doadores no padrão IATI (d-portal). Quando o doador não informa o CNPJ, a ligação é feita pelo nome idêntico ao do cadastro e pode haver erro: confira no link do projeto.</p></section>');
     }
     if (f.cepim) {
       partes.push("<section><h2>Impedimento (CEPIM)</h2>" + tabela(["Convênio", "Órgão", "Motivo"], f.cepim.map((l) => l.map(esc))) +
