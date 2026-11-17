@@ -516,7 +516,8 @@ e se está impedida de receber recursos. O dinheiro que doadores estrangeiros de
 quem executa ou recebe. Esses dados <strong>não têm confirmação oficial brasileira</strong>, por isso não são ligados a
 nenhuma ONG deste cadastro: ficam numa <a href="internacional/">lista à parte</a>, com o nome escrito exatamente como o doador publicou.</p></section>
 <section><h2>Por estado</h2>{tab_uf}</section>
-<section><h2>Por área de atuação</h2>{tab_area}</section>
+<section><h2>Por área de atuação</h2>{tab_area}
+<p class="dica">Uma OSC pode atuar em mais de uma área, por isso a soma passa do total.</p></section>
 
 <section id="fontes"><h2>Fontes e limites</h2>
 <ul>
