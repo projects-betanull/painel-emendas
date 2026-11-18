@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acompanhamento parlamentar: presença, votos e discursos</title>
+<meta name="description" content="Senado e Câmara em semicírculos: cada bolinha é um parlamentar. Veja por dia se houve sessão, quem esteve presente, como cada um votou e os discursos.">
+<link rel="stylesheet" href="../estilo.css">
+<link rel="stylesheet" href="parlamento.css">
+</head>
+<body>
+<header class="topo"><a href="../" class="marca">Emendas<span>.</span></a>
+<span class="sub">acompanhamento parlamentar</span>
+<nav class="menu"><a href="../painel/">Painel</a><a href="../parlamento/">Parlamento</a><a href="../explorar/">Explorar</a><a href="../sobre/">Fontes</a></nav></header>
+<main class="largo">
+<h1>Acompanhamento parlamentar</h1>
+<p class="dica topo-dica">Cada bolinha é um parlamentar. Escolha o dia, a cor (partido, bloco, presença ou voto) e toque numa bolinha para ver detalhes, discursos e emendas.</p>
+<div class="controles parl-controles">
+  <label>Dia
+    <span class="dia-nav"><button type="button" id="ant" class="mini" title="Sessão anterior">‹</button><input type="date" id="dia"><button type="button" id="prox" class="mini" title="Próxima sessão">›</button></span>
+  </label>
+  <label>Cor das bolinhas
+    <select id="cor">
+      <option value="partido">Partido</option>
+      <option value="bloco">Bloco parlamentar</option>
+      <option value="presenca">Presença no dia</option>
+      <option value="voto">Voto numa pauta</option>
+    </select>
+  </label>
+</div>
+<div id="aviso" class="dica" hidden></div>
+<div class="congresso">
+  <section class="cartao casa" id="c-senado">
+    <div class="cab"><h2>Senado Federal</h2><span class="estado" id="e-senado"></span></div>
+    <label class="pauta" hidden>Pauta (votação nominal)<select id="v-senado"></select></label>
+    <p class="pauta-info" id="i-senado"></p>
+    <div class="hemiciclo" id="h-senado"></div>
+    <ul class="legenda" id="l-senado"></ul>
+  </section>
+  <section class="cartao casa" id="c-camara">
+    <div class="cab"><h2>Câmara dos Deputados</h2><span class="estado" id="e-camara"></span></div>
+    <label class="pauta" hidden>Pauta (votação nominal)<select id="v-camara"></select></label>
+    <p class="pauta-info" id="i-camara"></p>
+    <div class="hemiciclo" id="h-camara"></div>
+    <ul class="legenda" id="l-camara"></ul>
+  </section>
+</div>
+<section class="cartao" id="detalhe" hidden></section>
+<section class="cartao"><div class="cab"><h2>Discursos do dia</h2></div><div id="discursos"><p class="dica">Carregando…</p></div></section>
+<section class="cartao notas">
+<h2>Como ler</h2>
+<ul>
+<li><strong>Sessão:</strong> sessões do Plenário publicadas por cada Casa (deliberativas, não deliberativas e solenes).</li>
+<li><strong>Presença na Câmara:</strong> registro de presença nas sessões deliberativas do Plenário. Quem não aparece no registro do dia é mostrado como ausente; a Câmara não publica, nestes arquivos, se a falta foi justificada.</li>
+<li><strong>Presença no Senado:</strong> o Senado não publica lista de presença por sessão. A presença vem das votações nominais do dia (votou ou registrou presença = presente; "não compareceu" = ausente; licença, missão ou atividade parlamentar = ausência justificada). Dia sem votação nominal fica como "não divulgada".</li>
+<li><strong>Votos:</strong> só votações nominais (painel eletrônico). Votações simbólicas não registram o voto de cada parlamentar. Votações secretas do Senado não aparecem.</li>
+<li><strong>Composição:</strong> parlamentares em exercício em cada dia, deduzidos dos registros de presença e voto do mês; o partido é o da data do voto. Blocos parlamentares são os da composição atual.</li>
+<li><strong>Emendas:</strong> o link "Emendas" abre o painel filtrado pelo nome do parlamentar como autor no Portal da Transparência, quando o nome confere.</li>
+</ul>
+</section>
+</main>
+<footer><p>Fontes oficiais: <a href="https://dadosabertos.camara.leg.br/">Dados Abertos da Câmara dos Deputados</a> e <a href="https://legis.senado.leg.br/dadosabertos/">Dados Abertos do Senado Federal</a>, atualizados todo dia. Dados reproduzidos como publicados. <a href="../sobre/">Fontes, método e limites</a>. Site independente e não oficial.</p></footer>
+<script src="parlamento.js"></script>
+</body>
+</html>

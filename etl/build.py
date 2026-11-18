@@ -190,6 +190,12 @@ def main(argv=None) -> dict:
             from .bancadas import gravar_bancadas
 
             gravar_bancadas(sorted(int(x) for x in fato["ano"].dropna().unique()), args.site)
+            try:  # acompanhamento parlamentar; falha não derruba o site de emendas
+                from .parlamento import gerar as gerar_parlamento
+
+                gerar_parlamento(args.site, fato["nome_autor"].dropna().unique().tolist())
+            except Exception as erro:  # noqa: BLE001
+                print(f"aviso: acompanhamento parlamentar não gerado ({type(erro).__name__}: {erro})")
         from .ongs import gerar as gerar_ongs
 
         qualidade["ongs"] = gerar_ongs(fav, args.site, baixar_fontes=not args.sem_baixar)
