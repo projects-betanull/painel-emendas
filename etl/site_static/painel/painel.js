@@ -59,7 +59,7 @@
     if (cubo.dims.favorecido) barrasH("favorecido");
     else $("g-favorecido").innerHTML = '<p class="dica">Toque numa UF ou num município para ver quem recebeu.</p>';
     const h = paraHash(est);
-    $("irExplorar").href = "../explorar/#" + h;
+    $("menu-explorar").href = "../explorar/#" + h;
     document.querySelectorAll(".cab a[data-dim]").forEach((a) => (a.href = "../explorar/#" + paraHash({ ...est, lin: a.dataset.dim, col: a.dataset.dim === "ano" ? "" : est.col === a.dataset.dim ? "" : est.col })));
   }
 

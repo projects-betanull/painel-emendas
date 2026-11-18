@@ -1,12 +1,13 @@
-# Painel de Emendas — contexto para o Claude Code
+# Painel Público — contexto para o Claude Code
 
-Site público (https://painel-emendas.pages.dev) que mostra quanto cada município recebeu em emendas parlamentares federais, de quem e para quem. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança via Lightning (lizard43@coinos.io): no MCP e no site (passe de 24 h: tabela completa e CSV no Explorar, relatório em PDF do município).
+Site público **Painel Público** (https://painel-emendas.pages.dev; o endereço antigo continua) com dados abertos do Brasil: quanto cada município recebeu em emendas parlamentares federais, de quem e para quem, acompanhamento parlamentar e outros painéis. Custo zero: GitHub Actions + Cloudflare Pages. Sem login. Cobrança via Lightning (lizard43@coinos.io): no MCP e no site (passe de 24 h: tabela completa e CSV no Explorar, relatório em PDF do município).
 
 ## Como funciona
 - `.github/workflows/etl.yml` roda todo dia 06:17 (Brasília): baixa os dados, testa, gera `site/` e publica no Cloudflare Pages (com `functions/`).
 - `etl/download.py`: Portal da Transparência (ZIP com 3 CSVs, novas tentativas se vier HTML), municípios (IBGE; cai para cópia kelvins no GitHub, pois o IBGE bloqueia o runner), população (IBGE/SIDRA).
 - `etl/normalize.py`: colunas, valores BR, localidade → código IBGE; `normalizar_favorecidos` (fonte dos totais por município, porque 83% do arquivo principal vem como "MÚLTIPLO").
 - `etl/build.py`: orquestra; `etl/site.py`: páginas estáticas (município e `/uf/xx/`, com link canônico e JSON-LD Dataset), Sobre (fontes, base legal, LGPD), Apoie, JSON da API e sitemap/llms.txt; `etl/cubo.py`: cubo do Explorar (+ um por UF com favorecidos); `etl/bancadas.py`: membros das bancadas (Câmara e Senado).
+- `etl/layout.py`: template comum (nome do site, cabeçalho com menu, rodapé, atalhos dos painéis). Páginas geradas usam `site.pagina()`; HTML de `site_static/` usa os marcadores `<!--#cabecalho sub="..."-->` e `<!--#rodape-->`, trocados no build. Painel novo: some uma linha em `MENU`/`PAINEIS` (aparece só quando a pasta dele existe em site_static). Nome também em `MARCA` de lib/og.js (teste confere).
 - `etl/site_static/`: CSS, `motor.js` (pivô compartilhado), `explorar/`, `painel/`, `gestao/`, `ia/`.
 - `lib/mcp.js` + `functions/mcp.js`: servidor MCP (Streamable HTTP) em /mcp. Grátis: buscar_municipio, resumo_municipio. Pago (passe 24 h, 1000 sats): detalhes e ranking. Fatura via LNURL do endereço Lightning; conferência pela API pública de faturas do coinos; token HMAC com TOKEN_SECRET.
 - `functions/api/passe.js` + `etl/site_static/passe.js`: compra do passe no navegador (fatura, QR via qrcode.js baixado do unpkg no build, conferência a cada 3 s, token no localStorage; o token do MCP também vale).
