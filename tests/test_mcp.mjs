@@ -35,3 +35,10 @@ const r = resumir("1", [{ niFornecedor: "11222333000181", nomeRazaoSocialFornece
   { niFornecedor: "12345678901", tipoPessoa: "PF", nomeRazaoSocialFornecedor: "FULANO", valorGlobal: 10 }]);
 ok(r.total_contratos === 2 && r.omitidos_pessoa_fisica === 1 && r.fornecedores[0].valor === 150 && r.recentes[0].data === "2026-02-02", "pncp resumir");
 console.log("mcp ok");
+
+// Bloqueio de /api/m e /api/ranking: variações de caminho que o Pages resolve para o mesmo arquivo.
+const { bloqueado } = await import("../functions/api/_middleware.js");
+for (const p of ["/api/m/3509502.json", "/api//m/3509502.json", "/api/%6d/3509502.json", "/api/%6D/3509502.json", "/api/m%2F3509502.json",
+  "/api/%2572anking/BR.json", "/api/%72anking/BR.json", "/API/M/3509502.json", "/api\\m/1.json", "/api/ranking/BR"]) ok(bloqueado(p), "bloqueio " + p);
+for (const p of ["/api/indice.json", "/api/contratos", "/api/passe", "/api/gestao", "/api/qualidade.json"]) ok(!bloqueado(p), "liberado " + p);
+console.log("bloqueio ok");

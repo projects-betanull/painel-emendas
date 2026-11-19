@@ -5,6 +5,7 @@ Tudo é HTML pronto, sem servidor: o Cloudflare Pages só entrega os arquivos.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -190,6 +191,9 @@ def barras_ano(por_ano: pd.Series) -> str:
     return f'<div class="barras">{itens}</div>'
 
 
+QRCODE_SHA256 = "18ae399f81182bc9de916e9c77b195df20cc58d6f2d55a62b085a299f1bf1780"
+
+
 def baixar_qrcode(destino: Path) -> None:
     """Gerador de QR code em JS (qrcode-generator, MIT) para as faturas Lightning do passe."""
     try:
@@ -197,7 +201,10 @@ def baixar_qrcode(destino: Path) -> None:
 
         r = requests.get("https://unpkg.com/qrcode-generator@1.4.4/qrcode.js", timeout=15)
         r.raise_for_status()
-        (destino / "qrcode.js").write_text(r.text, encoding="utf-8")
+        # O script roda na janela de pagamento: só publica se for exatamente o arquivo conhecido (npm 1.4.4).
+        if hashlib.sha256(r.content).hexdigest() != QRCODE_SHA256:
+            raise ValueError("qrcode.js com conteúdo inesperado")
+        (destino / "qrcode.js").write_bytes(r.content)
     except Exception as erro:  # sem QR, o passe mostra a fatura para copiar
         print(f"aviso: qrcode.js indisponível ({type(erro).__name__})")
 

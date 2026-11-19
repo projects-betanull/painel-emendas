@@ -1,5 +1,7 @@
 name: Sondar fontes novas
 on: { workflow_dispatch: {} }
+permissions:
+  contents: read
 jobs:
   sondar:
     runs-on: ubuntu-latest
