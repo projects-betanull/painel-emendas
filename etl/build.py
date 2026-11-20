@@ -196,6 +196,9 @@ def main(argv=None) -> dict:
                 gerar_parlamento(args.site, fato["nome_autor"].dropna().unique().tolist())
             except Exception as erro:  # noqa: BLE001
                 print(f"aviso: acompanhamento parlamentar não gerado ({type(erro).__name__}: {erro})")
+        from .ongs import gerar as gerar_ongs
+
+        qualidade["ongs"] = gerar_ongs(fav, args.site, baixar_fontes=not args.sem_baixar)
     (args.out / "qualidade.json").write_text(json.dumps(qualidade, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(qualidade, ensure_ascii=False, indent=2))
     print(
