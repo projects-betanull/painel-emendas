@@ -4,27 +4,6 @@ jobs:
   sondar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - name: Parlamento (gera sem publicar)
-        run: |
-          pip install -q -r requirements.txt
-          time python -m etl.parlamento /tmp/site
-          ls /tmp/site/parlamento/dados | wc -l; du -sh /tmp/site/parlamento/dados; ls -la /tmp/site/parlamento/dados/comissoes.json
-          python - <<'PY'
-          import json
-          D='/tmp/site/parlamento/dados/'
-          c=json.load(open(D+'comissoes.json'))
-          for casa in ('camara','senado'):
-              print(casa, len(c[casa]), 'comissões;', sum(len(x['m']) for x in c[casa].values()), 'vínculos; ex:', list(c[casa].values())[:1])
-          for casa in ('camara','senado'):
-              for m in ('2026-10','2026-11'):
-                  d=json.load(open(f'{D}{casa}-{m}.json'))
-                  print(casa, m, 'reuniões dias', len(d['reunioes']), 'reuniões', sum(len(v) for v in d['reunioes'].values()),
-                        'pres.reunião', len(d['presencaReuniao']), 'discursos dias', sorted(d['discursos'])[-5:], 'total', sum(len(v) for v in d['discursos'].values()))
-              d=json.load(open(f'{D}{casa}-2026-11.json')); print(list(d['reunioes'].items())[:1]); print(list(d['discursos'].items())[-1:])
-          PY
       - name: Apoiadores (ADPF 854)
         run: |
           curl -sL -A "Mozilla/5.0" https://portaldatransparencia.gov.br/emendas/adpf854 -o a.html; echo "status/size: $(wc -c < a.html)"
