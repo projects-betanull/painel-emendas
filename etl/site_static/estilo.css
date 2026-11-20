@@ -96,8 +96,10 @@ select, .facetas input[list] { font: inherit; padding: .45rem .5rem; border: 1px
 .bancada li span { color: var(--suave); font-size: .8rem; }
 .bancada h3 { font-size: .85rem; margin: .75rem 0 .25rem; color: var(--suave); }
 .bancada summary { cursor: pointer; font-weight: 600; margin: .4rem 0; }
-.menu { margin-left: auto; display: flex; gap: 1rem; }
-.menu a { font-weight: 600; text-decoration: none; padding: .5rem 0; }
+.menu { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0 1rem; }
+.menu a { font-weight: 600; text-decoration: none; padding: .5rem 0; border-bottom: 2px solid transparent; }
+.menu a[aria-current="page"] { color: var(--tinta); border-bottom-color: var(--acento); }
+@media (max-width: 40rem) { .menu { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; gap: 0 .9rem; } .menu a { white-space: nowrap; } }
 .contexto { color: var(--suave); margin: 0; }
 .resumo-texto { font-size: 1.1rem; line-height: 1.6; }
 .resumo-texto strong { color: var(--acento); }

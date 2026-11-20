@@ -1,4 +1,4 @@
-# Painel de Emendas — ETL (semana 1)
+# Painel Público (antigo Painel de Emendas) — ETL
 
 Baixa as emendas parlamentares do Portal da Transparência, liga cada linha ao município (código IBGE) e gera as tabelas do painel. Roda de graça todo dia no GitHub Actions.
 

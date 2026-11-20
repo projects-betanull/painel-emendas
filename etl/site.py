@@ -16,13 +16,13 @@ from urllib.parse import quote
 
 import pandas as pd
 
-from . import config
+from . import config, layout
 from .normalize import slug
 
 ESTATICOS = Path(__file__).parent / "site_static"
 PORTAL_DOWNLOAD = "https://portaldatransparencia.gov.br/download-de-dados/emendas-parlamentares"
 PORTAL_CONSULTA = "https://portaldatransparencia.gov.br/emendas"
-NOME_SITE = "Painel de Emendas"
+NOME_SITE = layout.NOME_SITE
 POP_MIN_DESTAQUE = 50_000  # ranking por habitante só entre municípios desse porte para cima
 
 
@@ -120,7 +120,12 @@ def url_cartao(chave: str, atualizado: str) -> str:
 
 
 def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, desde="2014", url: str = "", extra_head: str = "",
-           cartao: str = "site") -> str:
+           cartao: str = "site", sub: str = "para onde vai o dinheiro das emendas parlamentares", fonte: str | None = None) -> str:
+    """Página completa no template do site. `fonte`: linha de fonte oficial do rodapé (padrão: emendas, CGU)."""
+    if fonte is None:
+        fonte = f"""<p><strong>Fonte oficial:</strong> <a href="{PORTAL_DOWNLOAD}">Portal da Transparência do Governo Federal (CGU)</a>, arquivos de emendas parlamentares
+e de favorecidos, exercícios de {e(desde)} em diante, baixados e atualizados em {e(atualizado)}. Os valores são reproduzidos como publicados.
+<a href="{raiz}sobre/">Fontes, método e limites</a>.</p>"""
     og_url = ""
     if url is not None:
         completo = e(config.SITE_URL + "/" + url)
@@ -152,18 +157,13 @@ def pagina(titulo: str, descricao: str, corpo: str, raiz: str, atualizado: str, 
 <link rel="stylesheet" href="{raiz}estilo.css">
 </head>
 <body>
-<header class="topo"><a href="{raiz}" class="marca">Emendas<span>.</span></a>
-<span class="sub">para onde vai o dinheiro das emendas parlamentares</span>
-<nav class="menu"><a href="{raiz}painel/">Painel</a><a href="{raiz}parlamento/">Parlamento</a><a href="{raiz}explorar/">Explorar</a><a href="{raiz}ongs/">ONGs</a><a href="{raiz}ia/">IA</a><a href="{raiz}sobre/">Fontes</a><a href="{raiz}dados/">Passe ⚡</a></nav></header>
+{layout.cabecalho(raiz, sub, layout.secao_de(url or ""))}
 <main>
 {corpo}
 </main>
 <footer>
-<p><strong>Fonte oficial:</strong> <a href="{PORTAL_DOWNLOAD}">Portal da Transparência do Governo Federal (CGU)</a>, arquivos de emendas parlamentares
-e de favorecidos, exercícios de {e(desde)} em diante, baixados e atualizados em {e(atualizado)}. Os valores são reproduzidos como publicados.
-<a href="{raiz}sobre/">Fontes, método e limites</a>.</p>
-<p>Site independente, <strong>não oficial</strong> e sem vínculo com o governo, partidos ou parlamentares. Encontrou um erro?
-<a href="{config.REPO_URL}/issues">Avise aqui</a>. <a href="{raiz}apoie/">Apoie com Lightning ⚡</a></p>
+{fonte}
+{layout.rodape(raiz)}
 </footer>
 </body>
 </html>
@@ -276,7 +276,7 @@ Para trabalho com os dados completos, há o passe de 24 horas.</p>
 {bloco_passe("../")}
 <h2>Como citar</h2>
 <p class="citacao">Fonte: Portal da Transparência (CGU), dados de emendas parlamentares por favorecido, organizados pelo
-Painel de Emendas ({e(config.SITE_URL.replace("https://", ""))}), consulta em {e(atualizado)}.</p>
+{NOME_SITE} ({e(config.SITE_URL.replace("https://", ""))}), consulta em {e(atualizado)}.</p>
 <p>A fonte original é sempre o <a href="{PORTAL_DOWNLOAD}">Portal da Transparência</a>. Os valores são reproduzidos como
 publicados e não constituem juízo sobre a legalidade de nenhuma emenda. Antes de publicar, leia os
 <a href="../sobre/">limites dos dados</a>: o favorecido é quem recebeu o dinheiro da União, não a empresa contratada depois.</p>
@@ -318,6 +318,7 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
             shutil.copy(arq, destino / arq.name)
         else:
             shutil.copytree(arq, destino / arq.name)
+    layout.aplicar_em_estaticos(destino)
 
     agora = datetime.now(timezone.utc).astimezone()
     atualizado = agora.strftime("%d/%m/%Y")
@@ -566,8 +567,10 @@ Confira emenda por emenda na
 <ul id="res" class="resultados"></ul>
 <p id="ultimo" class="ultimo" hidden></p>
 </section>
-<section class="atalhos">
-<a href="painel/"><strong>Painel</strong><span>Gráficos que se filtram com um toque</span></a>
+<section class="atalhos" aria-label="Painéis">
+{layout.atalhos_paineis("")}
+</section>
+<section class="atalhos" aria-label="Perguntas sobre emendas">
 <a href="explorar/#l=autor&amp;c=ano"><strong>Quem mais enviou</strong><span>Parlamentares e bancadas, ano a ano</span></a>
 <a href="explorar/#l=uf&amp;c=area"><strong>Para quais áreas</strong><span>Saúde, educação, urbanismo… por estado</span></a>
 </section>
@@ -586,7 +589,7 @@ Confira emenda por emenda na
                    {"@context": "https://schema.org", "@type": "WebSite", "name": NOME_SITE, "url": config.SITE_URL + "/", "inLanguage": "pt-BR"},
                    dataset_ld("Emendas parlamentares federais por município", "Valores recebidos em emendas parlamentares federais por município, "
                               f"autor e favorecido, de {desde} em diante, reorganizados a partir dos arquivos do Portal da Transparência.",
-                              "", desde, "Brasil", hoje_iso))),
+                              "", desde, "Brasil", hoje_iso)), sub=layout.SLOGAN),
         encoding="utf-8",
     )
     gerar_sobre(destino, atualizado, desde, fonte_pop)
