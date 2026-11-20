@@ -97,7 +97,12 @@ def test_montagem_sem_vinculo_internacional(org, tmp_path):
     assert not any("11222333" in json.dumps(p) or "44555666" in json.dumps(p) for p in proj)
     html = (tmp_path / "ongs" / "index.html").read_text()
     assert 'o/?c=11222333' in html and "não liga" in html
-    assert "não vincula" in (tmp_path / "ongs" / "internacional" / "index.html").read_text()
+    internacional = (tmp_path / "ongs" / "internacional" / "index.html").read_text()
+    assert "não vincula" in internacional
+    # rodapé cita a fonte das ONGs, não a das emendas; menu marca a seção
+    assert "Mapa das OSCs (IPEA)" in html and "arquivos de emendas parlamentares" not in html
+    assert "padrão IATI" in internacional and "arquivos de emendas parlamentares" not in internacional
+    assert 'id="menu-ongs" href="../ongs/" aria-current="page"' in html
 
 
 def test_internacionais_raiz_com_8_digitos(tmp_path):
