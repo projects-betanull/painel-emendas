@@ -6,6 +6,9 @@ on:
     workflows: ["ETL diário de emendas"]
     types: [completed]
 
+permissions:
+  contents: read
+
 jobs:
   verificar:
     runs-on: ubuntu-latest
@@ -26,6 +29,7 @@ jobs:
           echo "passe pelo site (esperado fatura): $(curl -s -X POST $B/api/passe | head -c 60)"
           echo "qrcode.js: $(curl -s -o /dev/null -w '%{http_code}' $B/qrcode.js)"
           echo "api/m direto (esperado 403): $(curl -s -o /dev/null -w '%{http_code}' $B/api/m/3509502.json)"
+          echo "api/m por caminho alternativo (esperado 403 403 403): $(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/api//m/3509502.json) $(curl -s -o /dev/null -w '%{http_code}' $B/api/%6d/3509502.json) $(curl -s -o /dev/null -w '%{http_code}' $B/api/%72anking/BR.json)"
           echo "gestao com chave (esperado 200 e assinatura true): $(curl -s -H "x-admin-key: $ADMIN_KEY" $B/api/gestao)"
           echo "gestao sem chave (esperado 401): $(curl -s -o /dev/null -w '%{http_code}' $B/api/gestao)"
           for p in / painel/ explorar/ ia/ sobre/ gestao/ uf/sp/ municipio/campinas-sp/ sitemap.xml robots.txt llms.txt; do echo "$p $(curl -s -o /dev/null -w '%{http_code}' $B/$p)"; done
