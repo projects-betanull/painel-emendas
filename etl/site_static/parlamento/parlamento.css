@@ -20,3 +20,6 @@ button.mini { margin: 0; padding: .35rem .7rem; }
 #discursos li, #detalhe li { margin: .35rem 0; font-size: .9rem; }
 .notas li { font-size: .9rem; margin: .3rem 0; }
 .pauta[hidden] { display: none; }
+.integrantes { columns: 2 14rem; }
+.reuniao { font-size: .85rem; color: var(--suave); }
+#comissoes h3 { margin-bottom: .2rem; }

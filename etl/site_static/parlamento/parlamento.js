@@ -65,7 +65,37 @@ const PRESENCA = { P: ["Presente", "#2e9e5b"], F: ["Ausente", "#d64545"], J: ["A
 const VOTO = { S: ["Sim", "#2e9e5b"], N: ["Não", "#d64545"], A: ["Abstenção", "#e9b949"], O: ["Obstrução", "#7e57c2"],
   P: ["Presente, sem voto", "#8aa0b8"], J: ["Ausência justificada", "#f2d68c"], F: ["Não compareceu", "#c9cdd3"], "": ["Não votou", "#e3e5e8"] };
 
-if (typeof module !== "undefined") module.exports = { assentos, ordenar, membrosDoDia, corDe };
+// Comissões: integrantes ativos no dia ([id, cargo, de, ate]) e comissões de um parlamentar.
+const ativoNoDia = (m, dia) => (!m[2] || m[2] <= dia) && (!m[3] || m[3] >= dia);
+function membrosComissao(com, dia) {
+  const vistos = new Map();
+  for (const m of (com && com.m) || []) if (ativoNoDia(m, dia)) {
+    const atual = vistos.get(m[0]);
+    if (!atual || pesoCargo(m[1]) > pesoCargo(atual[1])) vistos.set(m[0], m);
+  }
+  return [...vistos.values()].sort((a, b) => pesoCargo(b[1]) - pesoCargo(a[1]));
+}
+function pesoCargo(c) {
+  c = (c || "").toLowerCase();
+  if (c.startsWith("presidente")) return 5;
+  if (c.includes("vice-presidente")) return 4;
+  if (c.startsWith("relator") || c.startsWith("coordenador")) return 3;
+  if (c.startsWith("titular")) return 2;
+  if (c.startsWith("suplente")) return 1;
+  return 2;
+}
+function comissoesDe(comissoes, id, dia) {
+  const out = [];
+  for (const [cod, com] of Object.entries(comissoes || {})) {
+    const ms = membrosComissao(com, dia).filter((m) => m[0] === String(id));
+    if (ms.length) out.push({ cod, s: com.s, n: com.n, t: com.t, cargo: ms[0][1] });
+  }
+  return out.sort((a, b) => pesoCargo(b.cargo) - pesoCargo(a.cargo) || a.s.localeCompare(b.s));
+}
+const CARGO = { 5: ["Presidente", "#0b3d2e"], 4: ["Vice-presidente", "#1f6f50"], 3: ["Relator ou coordenador", "#2e9e5b"],
+  2: ["Titular", "#5cbf7f"], 1: ["Suplente", "#b5e0c3"], 0: ["Não integra", "#e3e5e8"] };
+
+if (typeof module !== "undefined") module.exports = { assentos, ordenar, membrosDoDia, corDe, membrosComissao, comissoesDe, pesoCargo };
 
 // ---------------------------------------------------------------- página
 
@@ -75,7 +105,7 @@ if (typeof document !== "undefined") (async () => {
   const fmt = (d) => d.split("-").reverse().join("/");
   const CASAS = ["senado", "camara"], NOME = { senado: "Senado", camara: "Câmara" };
   const j = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [indice, cadastro, blocos] = await Promise.all([j("dados/indice.json"), j("dados/membros.json"), j("dados/blocos.json")]);
+  const [indice, cadastro, blocos, comissoes] = await Promise.all([j("dados/indice.json"), j("dados/membros.json"), j("dados/blocos.json"), j("dados/comissoes.json")]);
   if (!indice || !cadastro) { $("aviso").hidden = false; $("aviso").textContent = "Dados ainda não publicados. Volte depois da próxima atualização diária."; return; }
   const meses = {};
   const mes = (casa, m) => (meses[casa + m] ??= j(`dados/${casa}-${m}.json`));
@@ -83,8 +113,8 @@ if (typeof document !== "undefined") (async () => {
   const lerHash = () => {
     const p = new URLSearchParams(location.hash.slice(1));
     return { dia: /^\d{4}-\d\d-\d\d$/.test(p.get("d") || "") ? p.get("d") : diasSessao[diasSessao.length - 1] || indice.atualizado,
-      cor: ["partido", "bloco", "presenca", "voto"].includes(p.get("cor")) ? p.get("cor") : "partido",
-      v: { senado: p.get("vs") || "", camara: p.get("vc") || "" }, sel: p.get("p") || "" };
+      cor: ["partido", "bloco", "presenca", "voto", "comissao"].includes(p.get("cor")) ? p.get("cor") : "partido",
+      v: { senado: p.get("vs") || "", camara: p.get("vc") || "" }, sel: p.get("p") || "", com: p.get("c") || "" };
   };
   let est = lerHash();
   $("dia").min = diasSessao[0] || ""; $("dia").max = indice.atualizado;
@@ -95,7 +125,7 @@ if (typeof document !== "undefined") (async () => {
 
   function salvar() {
     const h = new URLSearchParams({ d: est.dia, cor: est.cor });
-    if (est.v.senado) h.set("vs", est.v.senado); if (est.v.camara) h.set("vc", est.v.camara); if (est.sel) h.set("p", est.sel);
+    if (est.v.senado) h.set("vs", est.v.senado); if (est.v.camara) h.set("vc", est.v.camara); if (est.sel) h.set("p", est.sel); if (est.com) h.set("c", est.com);
     history.replaceState(null, "", "#" + h);
   }
 
@@ -146,7 +176,11 @@ if (typeof document !== "undefined") (async () => {
         : "";
       // Cores
       let chave, rotulo, cor;
-      if (est.cor === "presenca") { chave = (x) => presencaDe(d, x.id); rotulo = (k) => PRESENCA[k][0]; cor = (k) => PRESENCA[k][1]; }
+      const [comCasa, comCod] = est.com.split(":");
+      const com = est.cor === "comissao" && comCasa === casa && comissoes && (comissoes[casa] || {})[comCod];
+      const cargos = com ? Object.fromEntries(membrosComissao(com, est.dia).map((m) => [m[0], pesoCargo(m[1])])) : null;
+      if (com) { chave = (x) => cargos[x.id] || 0; rotulo = (k) => CARGO[k][0]; cor = (k) => CARGO[k][1]; }
+      else if (est.cor === "presenca") { chave = (x) => presencaDe(d, x.id); rotulo = (k) => PRESENCA[k][0]; cor = (k) => PRESENCA[k][1]; }
       else if (est.cor === "voto") { chave = (x) => (vot ? vot.v[x.id] || "" : ""); rotulo = (k) => VOTO[k][0]; cor = (k) => VOTO[k][1]; }
       else if (est.cor === "bloco") { chave = (x) => blocoDe(casa)(x.p) || x.p + " (sem bloco)"; rotulo = (k) => k; cor = (k) => coresBloco[casa][k] || corDe(k, CORES_PARTIDO); }
       else { chave = (x) => x.p || "Sem partido"; rotulo = (k) => k; cor = (k) => corDe(k, CORES_PARTIDO); }
@@ -158,18 +192,68 @@ if (typeof document !== "undefined") (async () => {
       $("l-" + casa).innerHTML = Object.entries(cont).sort((a, b) => b[1] - a[1])
         .map(([k, n]) => `<li><i style="background:${cor(k)}"></i>${esc(rotulo(k))} <b>${n}</b></li>`).join("");
     }
-    discursosDoDia(); detalhe(); salvar();
+    discursosDoDia(); comissoesDoDia(); detalhe(); salvar();
+  }
+
+  const reunioesDoDia = (casa) => (atual[casa] && atual[casa].reunioes && atual[casa].reunioes[est.dia]) || [];
+  const presReuniao = (casa, ev) => (atual[casa] && atual[casa].presencaReuniao && atual[casa].presencaReuniao[ev]) || null;
+  const nomeCom = (casa, cod) => ((comissoes && comissoes[casa]) || {})[cod];
+  const link = (u, t = "ver ›") => (u ? ` <a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : "");
+  const realizada = (sit) => !/cancel|adiad|suspens|n[aã]o realizada/i.test(sit || "");
+
+  function comissoesDoDia() {
+    const box = $("comissoes");
+    if (!comissoes) { box.innerHTML = `<p class="dica">Dados de comissões ainda não publicados.</p>`; return; }
+    const [comCasa, comCod] = est.com.split(":");
+    box.innerHTML = `<div class="congresso">${CASAS.map((casa) => {
+      const rs = reunioesDoDia(casa);
+      const ops = Object.entries(comissoes[casa] || {}).filter(([, c]) => membrosComissao(c, est.dia).length)
+        .sort((a, b) => a[1].s.localeCompare(b[1].s));
+      const temReuniao = new Set(rs.map((r) => r[0]));
+      const escolhida = comCasa === casa && (comissoes[casa] || {})[comCod];
+      const cad = cadastro[casa] || {};
+      return `<div><h3>${NOME[casa]}</h3>
+        <p class="dica">${rs.length ? `${rs.length} reunião(ões) de comissão em ${fmt(est.dia)}:` : `Nenhuma reunião de comissão publicada em ${fmt(est.dia)}.`}</p>
+        <ul>${rs.map((r) => { const c = nomeCom(casa, r[0]) || {}; const pr = presReuniao(casa, r[5]);
+          return `<li><a href="#" class="com" data-com="${casa}:${esc(r[0])}">${esc(c.s || r[0])}</a> ${esc(c.n || "")} <span class="dica">· ${esc(r[1])}${r[2] ? " às " + esc(r[2]) : ""} · ${esc(r[3])}${pr ? ` · ${pr.length} presentes` : ""}</span>${link(r[4])}</li>`; }).join("")}</ul>
+        <label class="pauta">Integrantes da comissão<select data-casa="${casa}" class="escolhe-com"><option value="">Escolha uma comissão…</option>
+          ${ops.map(([cod, c]) => `<option value="${esc(cod)}"${escolhida && cod === comCod ? " selected" : ""}>${temReuniao.has(cod) ? "● " : ""}${esc(c.s)} · ${esc(c.n.slice(0, 70))}</option>`).join("")}</select></label>
+        ${escolhida ? `<p class="dica">${esc(escolhida.n)}${escolhida.t ? " · " + esc(escolhida.t) : ""}. As bolinhas do ${NOME[casa]} mostram os integrantes.</p>
+          <ul class="integrantes">${membrosComissao(escolhida, est.dia).map((m) => { const x = cad[m[0]] || {};
+            return `<li><a href="#" class="quem" data-casa="${casa}" data-id="${esc(m[0])}">${esc(x.n || m[0])}</a> <span class="dica">${esc(x.p || "")}${x.uf ? "-" + esc(x.uf) : ""} · ${esc(m[1])}</span></li>`; }).join("")}</ul>` : ""}
+      </div>`; }).join("")}</div>`;
+  }
+
+  function escolherComissao(valor) {
+    est.com = valor; est.cor = valor ? "comissao" : (est.cor === "comissao" ? "partido" : est.cor);
+    desenhar();
   }
 
   function discursosDoDia() {
+    const [selCasa, selId] = est.sel.split(":");
+    const linha = (casa, x, dia) => { const c = (cadastro[casa] || {})[x.id] || {};
+      return `<li>${dia ? `<strong>${fmt(dia)}</strong> · ` : ""}<a href="#" data-casa="${casa}" data-id="${x.id}" class="quem">${esc(c.n || x.id)}</a> <span class="dica">${esc(c.p || "")}${c.uf ? "-" + esc(c.uf) : ""} · ${esc(x.t)}</span> ${esc(x.r)} ${x.u ? `<a href="${esc(x.u)}" target="_blank" rel="noopener">ver ›</a>` : ""}</li>`; };
+    $("t-discursos").textContent = "Discursos do dia";
+    if (selId && (cadastro[selCasa] || {})[selId]) {
+      // Parlamentar selecionado: só os discursos dele (no dia e no resto do mês).
+      const nome = cadastro[selCasa][selId].n;
+      const todos = Object.entries((atual[selCasa] && atual[selCasa].discursos) || {}).sort()
+        .flatMap(([dia, ds]) => ds.filter((x) => String(x.id) === selId).map((x) => [dia, x]));
+      const hoje = todos.filter(([dia]) => dia === est.dia), outros = todos.filter(([dia]) => dia !== est.dia);
+      $("t-discursos").textContent = `Discursos de ${nome}`;
+      $("discursos").innerHTML = `<p class="dica"><a href="#" id="todos-discursos">Ver os discursos de todos em ${fmt(est.dia)} ›</a></p>
+        ${hoje.length ? `<ul>${hoje.map(([, x]) => linha(selCasa, x)).join("")}</ul>` : `<p class="dica">Nenhum discurso de ${esc(nome)} publicado em ${fmt(est.dia)}.</p>`}
+        ${outros.length ? `<h3>Outros discursos no mês (${outros.length})</h3><ul>${outros.map(([dia, x]) => linha(selCasa, x, dia)).join("")}</ul>` : ""}`;
+      return;
+    }
     const partes = CASAS.map((casa) => {
       const ds = (atual[casa] && atual[casa].discursos && atual[casa].discursos[est.dia]) || [];
-      if (!ds.length) return "";
+      if (!ds.length) return `<h3>${NOME[casa]}</h3><p class="dica">Nenhum discurso publicado para ${fmt(est.dia)}.</p>`;
       const cad = cadastro[casa] || {};
       return `<h3>${NOME[casa]} (${ds.length})</h3><ul>${ds.map((x) => { const c = cad[x.id] || {};
         return `<li><a href="#" data-casa="${casa}" data-id="${x.id}" class="quem">${esc(c.n || x.id)}</a> <span class="dica">${esc(c.p || "")}${c.uf ? "-" + esc(c.uf) : ""} · ${esc(x.t)}</span> ${esc(x.r)} ${x.u ? `<a href="${esc(x.u)}" target="_blank" rel="noopener">ver ›</a>` : ""}</li>`; }).join("")}</ul>`;
     }).join("");
-    $("discursos").innerHTML = partes || `<p class="dica">Nenhum discurso publicado para ${fmt(est.dia)}. As Casas publicam os discursos alguns dias depois da sessão.</p>`;
+    $("discursos").innerHTML = partes + `<p class="dica">No Senado, o resumo e o texto do discurso saem cerca de três semanas depois; até lá aparece quem usou a palavra, com o vídeo da sessão.</p>`;
   }
 
   function detalhe() {
@@ -189,6 +273,14 @@ if (typeof document !== "undefined") (async () => {
       <p>${fmt(est.dia)}: <strong>${PRESENCA[pres][0]}</strong>${pres === "?" && d && d.sessoes && d.sessoes[est.dia] ? " (sem registro publicado)" : ""}</p>
       <p>${emendas} <a class="botao2" href="${esc(c.u)}" target="_blank" rel="noopener">Perfil oficial ›</a></p></div></div>
       ${vots.length ? `<h3>Votos no dia</h3><ul>${vots.map((v) => `<li><strong>${VOTO[v.v[id]] ? VOTO[v.v[id]][0] : esc(v.v[id])}</strong> · ${esc(v.titulo)} · ${esc((v.desc || "").slice(0, 160))}</li>`).join("")}</ul>` : ""}
+      ${(() => { const cs = comissoesDe((comissoes || {})[casa], id, est.dia); if (!cs.length) return "";
+        const rs = reunioesDoDia(casa);
+        return `<h3>Comissões (${cs.length})</h3><ul>${cs.map((c) => { const r = rs.filter((x) => x[0] === c.cod);
+          const info = r.map((x) => { const pr = presReuniao(casa, x[5]);
+            const st = pr ? (pr.includes(Number(id)) ? " · presente" : realizada(x[3]) ? " · sem registro de presença" : "") : "";
+            return `reunião: ${esc(x[1])}${x[2] ? " às " + esc(x[2]) : ""} (${esc(x[3])})${st}${link(x[4])}`; }).join("; ");
+          return `<li><a href="#" class="com" data-com="${casa}:${esc(c.cod)}">${esc(c.s)}</a> ${esc(c.n)} <span class="dica">· ${esc(c.cargo)}</span>${info ? `<br><span class="reuniao">${info}</span>` : ""}</li>`; }).join("")}</ul>
+          <p class="dica">${rs.length ? "" : `Nenhuma reunião de comissão publicada em ${fmt(est.dia)}.`}</p>`; })()}
       ${disc.length ? `<h3>Discursos no dia</h3><ul>${disc.map((x) => `<li>${esc(x.t)} · ${esc(x.r)} ${x.u ? `<a href="${esc(x.u)}" target="_blank" rel="noopener">ver ›</a>` : ""}</li>`).join("")}</ul>` : ""}`;
   }
 
@@ -203,14 +295,20 @@ if (typeof document !== "undefined") (async () => {
   $("prox").addEventListener("click", () => pular(1));
   $("cor").addEventListener("change", (e) => { est.cor = e.target.value; desenhar(); });
   for (const c of CASAS) $("v-" + c).addEventListener("change", (e) => { est.v[c] = e.target.value; desenhar(); });
+  document.addEventListener("change", (e) => {
+    if (e.target.matches("select.escolhe-com")) escolherComissao(e.target.value ? e.target.dataset.casa + ":" + e.target.value : "");
+  });
   document.addEventListener("click", (e) => {
+    if (e.target.id === "todos-discursos") { e.preventDefault(); est.sel = ""; document.querySelectorAll("circle.sel").forEach((x) => x.classList.remove("sel")); detalhe(); discursosDoDia(); salvar(); return; }
+    const c = e.target.closest("a.com");
+    if (c) { e.preventDefault(); escolherComissao(c.dataset.com); $("c-comissoes").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     const t = e.target.closest("circle[data-id], a.quem");
     if (!t) return;
     e.preventDefault();
     est.sel = t.dataset.casa + ":" + t.dataset.id;
     document.querySelectorAll("circle.sel").forEach((x) => x.classList.remove("sel"));
     document.querySelectorAll(`circle[data-casa="${t.dataset.casa}"][data-id="${t.dataset.id}"]`).forEach((x) => x.classList.add("sel"));
-    detalhe(); salvar();
+    detalhe(); discursosDoDia(); salvar();
     if (t.tagName === "A") $("detalhe").scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
   window.addEventListener("hashchange", () => { est = lerHash(); desenhar(); });
