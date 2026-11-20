@@ -1,0 +1,10 @@
+# Cabeçalhos de segurança do Cloudflare Pages (valem para os arquivos estáticos; /mcp e /api/* definem os seus).
+/*
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Strict-Transport-Security: max-age=31536000
+
+/gestao/*
+  X-Robots-Tag: noindex
+  Cache-Control: no-store
