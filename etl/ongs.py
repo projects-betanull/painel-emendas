@@ -59,6 +59,16 @@ AREAS = {
 }
 
 
+# Linha de fonte oficial do rodapé das páginas de ONGs (o resto do rodapé vem de layout.rodape).
+FONTE_ONGS = ('<p><strong>Fontes oficiais:</strong> <a href="https://mapaosc.ipea.gov.br/base-dados">Mapa das OSCs (IPEA)</a> e '
+              '<a href="https://portaldatransparencia.gov.br/download-de-dados">Portal da Transparência (CGU)</a>, ligados pelo CNPJ. '
+              'Valores reproduzidos como publicados; não constituem juízo sobre a legalidade de nenhum repasse. '
+              '<a href="{raiz}ongs/#fontes">Fontes e limites</a>.</p>')
+FONTE_IATI = ('<p><strong>Fonte:</strong> dados publicados pelos próprios doadores no padrão IATI '
+              '(<a href="https://d-portal.org/">d-portal</a>), com os nomes como o doador escreveu e <strong>sem vínculo com CNPJ</strong>. '
+              '<a href="{raiz}ongs/#fontes">Fontes e limites</a>.</p>')
+
+
 def digitos(v) -> str:
     return re.sub(r"\D", "", str(v or ""))
 
@@ -543,7 +553,7 @@ ou sobre a atuação de nenhuma organização. Encontrou um erro? <a href="https
         pagina("Transparência das ONGs: dinheiro público e estrangeiro de cada organização",
                "Quanto cada ONG do Brasil recebeu em emendas parlamentares e convênios federais, onde atua e se está impedida. "
                "Projetos de doadores estrangeiros no Brasil, como declarados. Todas as OSCs do país, com fonte oficial.", corpo, "../", atualizado,
-               url="ongs/", extra_head=json_ld({"@context": "https://schema.org", "@type": "Dataset",
+               url="ongs/", fonte=FONTE_ONGS.format(raiz="../"), sub="transparência das ONGs", extra_head=json_ld({"@context": "https://schema.org", "@type": "Dataset",
                    "name": "Transparência das organizações da sociedade civil do Brasil",
                    "description": "Cadastro das OSCs (IPEA) ligado pelo CNPJ a emendas, convênios federais e CEPIM; projetos de doadores estrangeiros (IATI) à parte.",
                    "url": "https://painel-emendas.pages.dev/ongs/", "inLanguage": "pt-BR", "isAccessibleForFree": True})),
@@ -596,7 +606,8 @@ Reproduzidos como publicados, sem juízo sobre legalidade.</p>
     (pasta / "internacional" / "index.html").write_text(
         pagina("Projetos de doadores estrangeiros no Brasil (IATI): organizações citadas",
                "Projetos que governos e fundações estrangeiras declaram financiar no Brasil, com o nome das organizações "
-               "como o doador publicou. Sem vínculo com CNPJ.", corpo, "../../", atualizado, url="ongs/internacional/"),
+               "como o doador publicou. Sem vínculo com CNPJ.", corpo, "../../", atualizado, url="ongs/internacional/",
+               fonte=FONTE_IATI.format(raiz="../../"), sub="transparência das ONGs"),
         encoding="utf-8")
     return {"iati_projetos": n_proj, "iati_linhas": len(linhas)}
 
