@@ -100,15 +100,19 @@ def test_gerar_sem_rede(tmp_path, monkeypatch):
     linhas = {
         "eventos": [{"id": "1", "dataHoraInicio": "2026-11-11T14:00:00", "situacao": "Encerrada", "descricaoTipo": "Sessão Deliberativa"}],
         "eventosPresencaDeputados": [{"idEvento": "1", "idDeputado": "10"}],
-        "votacoes": [], "votacoesVotos": [], "votacoesProposicoes": [],
+        "votacoes": [], "votacoesVotos": [], "votacoesProposicoes": [], "eventosOrgaos": [],
     }
     monkeypatch.setattr(P, "camara_csv", lambda nome, ano: linhas[nome] if ano == 2026 else [])
     monkeypatch.setattr(P, "camara_discursos", lambda ids, desde, ate: {"2026-11": {"2026-11-11": [{"id": 10, "t": "Breves", "r": "Resumo", "u": ""}]}})
     monkeypatch.setattr(P, "camara_blocos", lambda: {"MDB": "Bloco A"})
     monkeypatch.setattr(P, "senado_senadores", lambda: [{"id": "5", "n": "Senadora X", "p": "PT", "uf": "DF", "atual": True}])
-    monkeypatch.setattr(P, "senado_sessoes", lambda m: {"2026-11-10": [{"t": "Sessão deliberativa ordinária", "h": "14:00"}]} if m == "2026-11" else {})
+    monkeypatch.setattr(P, "senado_sessoes", lambda m: {"2026-11-10": [{"t": "Sessão deliberativa ordinária", "h": "14:00", "c": "594172"}]} if m == "2026-11" else {})
     monkeypatch.setattr(P, "senado_discursos", lambda m: {})
     monkeypatch.setattr(P, "senado_blocos", lambda: {})
+    monkeypatch.setattr(P, "camara_comissoes", lambda: {"2003": {"s": "CCJC", "n": "CCJ", "t": "Comissão Permanente", "m": [["10", "Titular", "2023-03-01", None]]}})
+    monkeypatch.setattr(P, "senado_comissoes", lambda cods: {"38": {"s": "CAE", "n": "Assuntos Econômicos", "t": "", "m": [[c, "Titular", None, None] for c in cods]}})
+    monkeypatch.setattr(P, "senado_reunioes", lambda m, hoje: {"2026-11-11": [["38", "Reunião deliberativa", "10:00", "Realizada", "", "1"]]} if m == "2026-11" else {})
+    monkeypatch.setattr(P, "senado_oradores", lambda c: [{"id": "5", "t": "Usou a palavra", "r": "", "u": "https://video"}])
 
     class R:
         def __init__(self, dados): self.dados = dados
@@ -118,7 +122,7 @@ def test_gerar_sem_rede(tmp_path, monkeypatch):
     monkeypatch.setattr(P, "_get", lambda url, **kw: R(votos if kw.get("params", {}).get("dataInicio", "").startswith("2026-11") else []))
     P.gerar(tmp_path, ["ACÁCIO FAVACHO"], hoje=hoje)
     pasta = tmp_path / "parlamento" / "dados"
-    assert sorted(p.name for p in pasta.iterdir()) == ["blocos.json", "camara-2026-10.json", "camara-2026-11.json", "indice.json",
+    assert sorted(p.name for p in pasta.iterdir()) == ["blocos.json", "camara-2026-10.json", "camara-2026-11.json", "comissoes.json", "indice.json",
                                                          "membros.json", "senado-2026-10.json", "senado-2026-11.json"]
     ind = json.loads((pasta / "indice.json").read_text())
     assert ind["dias"]["camara"] == {"2026-11-11": ["Sessão Deliberativa"]} and "2026-11-10" in ind["dias"]["senado"]
@@ -129,6 +133,57 @@ def test_gerar_sem_rede(tmp_path, monkeypatch):
     assert cam["membros"]["10"][2] == "MDB"
     sen = json.loads((pasta / "senado-2026-11.json").read_text())
     assert sen["presenca"] == {"2026-11-10": {"5": "P"}} and sen["membros"]["5"] == [None, None, "PT"]
+    # Sem discurso publicado: quem usou a palavra, com o vídeo da sessão.
+    assert sen["discursos"] == {"2026-11-10": [{"id": "5", "t": "Usou a palavra", "r": "", "u": "https://video"}]}
+    assert sen["reunioes"]["2026-11-11"][0][0] == "38"
+    com = json.loads((pasta / "comissoes.json").read_text())
+    assert com["camara"]["2003"]["s"] == "CCJC" and com["senado"]["38"]["m"] == [["5", "Titular", None, None]]
+
+
+def test_reunioes_de_comissao_na_camara():
+    eventos = [
+        {"id": "1", "dataHoraInicio": "2026-11-11T14:00:00", "situacao": "Encerrada", "descricaoTipo": "Sessão Deliberativa"},
+        {"id": "3", "dataHoraInicio": "2026-11-11T10:00:00", "situacao": "Encerrada (Final)", "descricaoTipo": "Reunião Deliberativa"},
+        {"id": "4", "dataHoraInicio": "2026-11-12T10:00:00", "situacao": "Cancelada", "descricaoTipo": "Audiência Pública"},
+    ]
+    eo = [{"idEvento": "1", "idOrgao": "180"}, {"idEvento": "3", "idOrgao": "2003"}, {"idEvento": "4", "idOrgao": "2001"}]
+    pres = [{"idEvento": "1", "idDeputado": "10"}, {"idEvento": "3", "idDeputado": "10"}, {"idEvento": "3", "idDeputado": "20"}]
+    m = P.montar_camara(eventos, pres, [], [], [], eo)["2026-11"]
+    assert m["presenca"] == {"2026-11-11": [10]}  # reunião de comissão não conta como presença no Plenário
+    assert m["reunioes"]["2026-11-11"] == [["2003", "Reunião Deliberativa", "10:00", "Encerrada (Final)",
+                                            "https://www.camara.leg.br/evento-legislativo/3", "3"]]
+    assert m["reunioes"]["2026-11-12"][0][3] == "Cancelada"
+    assert m["presencaReuniao"] == {"3": [10, 20]}
+
+
+def test_comissoes_e_oradores():
+    linhas = [
+        {"uriOrgao": "x/orgaos/2003", "siglaOrgao": "CCJC", "nomePublicacaoOrgao": "CCJ", "uriDeputado": "x/deputados/10",
+         "cargo": "Titular", "dataInicio": "2025-03-01", "dataFim": ""},
+        {"uriOrgao": "x/orgaos/2003", "siglaOrgao": "CCJC", "nomePublicacaoOrgao": "CCJ", "uriDeputado": "x/deputados/20",
+         "cargo": "Presidente", "dataInicio": "2025-03-01T00:00", "dataFim": "2026-02-01"},
+    ]
+    c = P.montar_comissoes_camara(linhas, {"2003": "Comissão Permanente"})
+    assert c == {"2003": {"s": "CCJC", "n": "CCJ", "t": "Comissão Permanente",
+                          "m": [["10", "Titular", "2025-03-01", None], ["20", "Presidente", "2025-03-01", "2026-02-01"]]}}
+    sen = P.montar_comissoes_senado({"5012": [
+        {"IdentificacaoComissao": {"CodigoComissao": "38", "SiglaComissao": "CAE", "NomeComissao": "Assuntos Econômicos"},
+         "DescricaoParticipacao": "Titular", "DataInicio": "2023-03-01"},
+        {"IdentificacaoComissao": {"CodigoComissao": "2042", "SiglaComissao": "GPX", "NomeComissao": "Antiga"},
+         "DescricaoParticipacao": "Titular", "DataInicio": "2014-08-06", "DataFim": "2018-12-28"},
+    ]}, {"38": "Comissão Permanente"})
+    assert list(sen) == ["38"] and sen["38"]["m"] == [["5012", "Titular", "2023-03-01", None]]
+    enc = {"ServicoPlenario": {"encontros": {"encontro": [{"linkVideo": "https://yt", "oradores": {"orador": [
+        {"codParlamentarInscricao": "5008", "codUsoPalavra": "1", "cancelado": "N"},
+        {"codParlamentarInscricao": "22", "codUsoPalavra": None, "cancelado": "N"},
+        {"codParlamentarInscricao": "70", "codUsoPalavra": "2", "cancelado": "S"},
+        {"codParlamentarInscricao": "5008", "codUsoPalavra": "3", "cancelado": "N"},
+    ]}}]}}}
+    assert [o["id"] for o in P.montar_oradores(enc)] == ["5008"] and P.montar_oradores(enc)[0]["u"] == "https://yt"
+    ag = {"AgendaReuniao": {"reunioes": {"reuniao": [{"codigo": 15031, "colegiadoCriador": {"codigo": 834, "sigla": "CDH"},
+          "dataInicio": "2026-11-12T15:00:00.000", "situacao": "Realizada", "tipo": {"descricao": "Outros eventos"},
+          "urlUltimoResultadoPublicado": "https://r"}]}}}
+    assert P.montar_reunioes_senado(ag) == {"2026-11-12": [["834", "Outros eventos", "15:00", "Realizada", "https://r", "15031"]]}
 
 
 def test_geometria_semicirculos():
@@ -152,3 +207,20 @@ console.log(JSON.stringify(out));
         assert out[n]["yminTigela"] >= -1e-9  # Câmara: tigela
     assert out["ordem"] == ["1", "4", "2"]  # bloco (2 partidos) antes do partido avulso menor
     assert out["dia"] == ["a"]
+
+
+def test_comissoes_no_navegador():
+    script = f"""
+const m = require({json.dumps(str(JS))});
+const com = {{ s: "CCJC", n: "CCJ", m: [["1", "Titular", "2025-01-01", "2025-12-31"], ["1", "Presidente", "2026-01-01", null],
+  ["2", "Suplente", null, null], ["3", "Titular", "2026-12-01", null]] }};
+console.log(JSON.stringify({{
+  ativos: m.membrosComissao(com, "2026-11-11").map(x => [x[0], x[1]]),
+  antes: m.membrosComissao(com, "2025-06-01").map(x => x[0]),
+  de: m.comissoesDe({{ "2003": com, "9": {{ s: "X", n: "Outra", m: [["2", "Titular", null, null]] }} }}, "2", "2026-11-11").map(c => [c.s, c.cargo]),
+}}));
+"""
+    out = json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout)
+    assert out["ativos"] == [["1", "Presidente"], ["2", "Suplente"]]  # 3 ainda não entrou; presidente antes do suplente
+    assert out["antes"] == ["1", "2"]
+    assert out["de"] == [["X", "Titular"], ["CCJC", "Suplente"]]

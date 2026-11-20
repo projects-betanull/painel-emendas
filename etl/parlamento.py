@@ -14,6 +14,7 @@ Saída em site/parlamento/dados/ (poucos arquivos, um por casa e mês):
 - indice.json: dias com sessão, meses disponíveis, data de atualização
 - membros.json: cadastro (nome, partido atual, UF, foto, perfil, autor no Portal da Transparência)
 - blocos.json: blocos parlamentares atuais (partido -> bloco) por casa
+- comissoes.json: comissões de cada casa na legislatura, com integrantes (cargo, início e fim)
 - camara-AAAA-MM.json e senado-AAAA-MM.json: sessões, presença, votações e discursos do mês
 
 Meses fechados já publicados são reaproveitados do próprio site (sem baixar tudo de novo).
@@ -37,7 +38,7 @@ import requests
 
 from . import config
 
-VERSAO = 1
+VERSAO = 2  # 2: reuniões de comissão e oradores do Senado
 INICIO = date(2023, 2, 1)  # 57ª legislatura
 CAMARA_ARQ = "https://dadosabertos.camara.leg.br/arquivos/{nome}/csv/{nome}-{ano}.csv"
 CAMARA_API = "https://dadosabertos.camara.leg.br/api/v2"
@@ -109,13 +110,32 @@ def camara_csv(nome: str, ano: int) -> list[dict]:
 # ---------------------------------------------------------------- Câmara
 
 
+def novo_mes() -> dict:
+    return {"sessoes": {}, "presenca": {}, "votacoes": [], "partidos": {}, "reunioes": {}, "presencaReuniao": {}}
+
+
 def montar_camara(eventos: list[dict], presencas: list[dict], votacoes: list[dict], votos: list[dict],
-                  proposicoes: list[dict]) -> dict[str, dict]:
-    """Agrupa por mês: sessões do Plenário, presença por dia e votações nominais."""
-    out: dict[str, dict] = defaultdict(lambda: {"sessoes": {}, "presenca": {}, "votacoes": [], "partidos": {}})
+                  proposicoes: list[dict], eventos_orgaos: list[dict] | None = None) -> dict[str, dict]:
+    """Agrupa por mês: sessões do Plenário, presença por dia, votações nominais e reuniões de comissão
+    (com a presença registrada em cada reunião)."""
+    out: dict[str, dict] = defaultdict(novo_mes)
     sessao_dia: dict[str, str] = {}
+    orgaos_ev = defaultdict(list)
+    for x in eventos_orgaos or []:
+        if x.get("idOrgao") and x["idOrgao"] != "180":
+            orgaos_ev[x.get("idEvento")].append(x["idOrgao"])
+    reuniao_ev: dict[str, str] = {}
     for e in eventos:
         tipo = e.get("descricaoTipo") or ""
+        if not tipo.startswith("Sessão") and orgaos_ev.get(e.get("id")):
+            d = (e.get("dataHoraInicio") or "")[:10]
+            if d:
+                for o in orgaos_ev[e["id"]]:
+                    out[d[:7]]["reunioes"].setdefault(d, []).append(
+                        [o, tipo, (e.get("dataHoraInicio") or "")[11:16], e.get("situacao") or "",
+                         f"https://www.camara.leg.br/evento-legislativo/{e['id']}", e["id"]])
+                reuniao_ev[e["id"]] = d
+            continue
         if not tipo.startswith("Sessão") or "Cancelada" in (e.get("situacao") or ""):
             continue
         d = (e.get("dataHoraInicio") or "")[:10]
@@ -126,10 +146,17 @@ def montar_camara(eventos: list[dict], presencas: list[dict], votacoes: list[dic
         if deliberativa:
             sessao_dia[e["id"]] = d
     pres = defaultdict(set)
+    pres_reuniao = defaultdict(set)
     for p in presencas:
+        if not p.get("idDeputado"):
+            continue
         d = sessao_dia.get(p.get("idEvento"))
-        if d and p.get("idDeputado"):
+        if d:
             pres[d].add(int(p["idDeputado"]))
+        elif p.get("idEvento") in reuniao_ev:
+            pres_reuniao[p["idEvento"]].add(int(p["idDeputado"]))
+    for ev, ids in pres_reuniao.items():
+        out[reuniao_ev[ev][:7]]["presencaReuniao"][ev] = sorted(ids)
     for d, ids in pres.items():
         out[d[:7]]["presenca"][d] = sorted(ids)
     props = defaultdict(list)
@@ -192,6 +219,29 @@ def camara_blocos() -> dict[str, str]:
     return out
 
 
+def camara_comissoes() -> dict[str, dict]:
+    """Órgãos da Câmara com integrantes na 57ª legislatura (arquivo orgaosDeputados-L57)."""
+    url = "https://dadosabertos.camara.leg.br/arquivos/{n}/csv/{n}{s}.csv"
+    tipos = {}
+    for o in csv.DictReader(io.StringIO(_get(url.format(n="orgaos", s=""), timeout=600).content.decode("utf-8-sig")), delimiter=";"):
+        tipos[o["uri"].rsplit("/", 1)[-1]] = o.get("tipoOrgao") or ""
+    linhas = csv.DictReader(io.StringIO(_get(url.format(n="orgaosDeputados", s="-L57"), timeout=600).content.decode("utf-8-sig")), delimiter=";")
+    return montar_comissoes_camara(linhas, tipos)
+
+
+def montar_comissoes_camara(linhas, tipos: dict[str, str]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for x in linhas:
+        o = (x.get("uriOrgao") or "").rsplit("/", 1)[-1]
+        dep = (x.get("uriDeputado") or "").rsplit("/", 1)[-1]
+        if not o or not dep:
+            continue
+        c = out.setdefault(o, {"s": x.get("siglaOrgao") or "", "n": x.get("nomePublicacaoOrgao") or x.get("nomeOrgao") or "",
+                               "t": tipos.get(o, ""), "m": []})
+        c["m"].append([dep, x.get("cargo") or "", (x.get("dataInicio") or "")[:10] or None, (x.get("dataFim") or "")[:10] or None])
+    return out
+
+
 def camara_discursos(ids: list[int], desde: date, ate: date) -> dict[str, dict]:
     """Discursos por deputado (API v2), agrupados por mês e dia."""
     def um(i):
@@ -232,7 +282,8 @@ def senado_sessoes(mes: str) -> dict[str, list]:
             continue
         d = s.get("Data", "")
         if d[:7] == mes:
-            out.setdefault(d, []).append({"t": (s.get("TipoSessao") or "").strip().capitalize(), "h": s.get("Hora", "")})
+            out.setdefault(d, []).append({"t": (s.get("TipoSessao") or "").strip().capitalize(), "h": s.get("Hora", ""),
+                                          "c": str(s.get("CodigoSessao") or "")})
     return out
 
 
@@ -278,6 +329,83 @@ def senado_discursos(mes: str) -> dict[str, list]:
             out[d].append({"id": str(p["CodigoParlamentar"]), "t": (p.get("TipoUsoPalavra") or {}).get("Descricao", ""),
                            "r": (p.get("Resumo") or "")[:220], "u": p.get("TextoIntegral") or ""})
     return dict(out)
+
+
+def senado_oradores(codigo_sessao: str) -> list[dict]:
+    """Quem usou a palavra numa sessão do Plenário (o resumo do discurso só sai semanas depois)."""
+    r = _get(f"{SENADO}/plenario/encontro/{codigo_sessao}")
+    return montar_oradores(r.json())
+
+
+def montar_oradores(dados: dict) -> list[dict]:
+    out, vistos = [], set()
+    for enc in _lista(((dados.get("ServicoPlenario") or {}).get("encontros") or {}).get("encontro")):
+        video = enc.get("linkVideo") or ""
+        for o in _lista((enc.get("oradores") or {}).get("orador")):
+            k = str(o.get("codParlamentarInscricao") or "")
+            if not k or o.get("cancelado") == "S" or not o.get("codUsoPalavra") or k in vistos:
+                continue
+            vistos.add(k)
+            out.append({"id": k, "t": "Usou a palavra (resumo ainda não publicado)", "r": "", "u": video})
+    return out
+
+
+def senado_reunioes(mes: str, hoje: date) -> dict[str, list]:
+    fim = min(ultimo_dia(mes), hoje)
+    r = _get(f"{SENADO}/comissao/agenda/{mes.replace('-', '')}01/{fim.strftime('%Y%m%d')}.json")
+    return montar_reunioes_senado(r.json())
+
+
+def montar_reunioes_senado(dados: dict) -> dict[str, list]:
+    out = defaultdict(list)
+    for x in _lista(((dados.get("AgendaReuniao") or {}).get("reunioes") or {}).get("reuniao")):
+        col = x.get("colegiadoCriador") or {}
+        d = (x.get("dataInicio") or "")[:10]
+        if not d or not col.get("codigo"):
+            continue
+        url = x.get("urlUltimoResultadoPublicado") or x.get("urlUltimaPautaSimplesPublicada") or ""
+        out[d].append([str(col["codigo"]), (x.get("tipo") or {}).get("descricao") or x.get("titulo") or "",
+                       (x.get("dataInicio") or "")[11:16], x.get("situacao") or "", url, str(x.get("codigo") or "")])
+    return dict(out)
+
+
+def senado_comissoes(codigos: list[str]) -> dict[str, dict]:
+    """Comissões de que cada senador participou desde o início da legislatura."""
+    tipos = {}
+    try:
+        for c in _lista(((_get(f"{SENADO}/comissao/lista/colegiados.json").json().get("ListaColegiados") or {})
+                         .get("Colegiados") or {}).get("Colegiado")):
+            tipos[str(c.get("Codigo"))] = c.get("DescricaoTipoColegiado") or ""
+    except (requests.RequestException, ValueError):
+        pass
+
+    def um(cod):
+        try:
+            p = _get(f"{SENADO}/senador/{cod}/comissoes.json").json()
+        except (requests.RequestException, ValueError):
+            return cod, []
+        return cod, _lista((((p.get("MembroComissaoParlamentar") or {}).get("Parlamentar") or {})
+                            .get("MembroComissoes") or {}).get("Comissao"))
+    with ThreadPoolExecutor(6) as ex:
+        return montar_comissoes_senado(dict(ex.map(um, codigos)), tipos)
+
+
+def montar_comissoes_senado(por_senador: dict[str, list], tipos: dict[str, str]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    inicio = INICIO.isoformat()
+    for cod, lista in por_senador.items():
+        for x in lista:
+            fim = (x.get("DataFim") or "")[:10] or None
+            if fim and fim < inicio:
+                continue
+            i = x.get("IdentificacaoComissao") or {}
+            c = str(i.get("CodigoComissao") or "")
+            if not c:
+                continue
+            item = out.setdefault(c, {"s": i.get("SiglaComissao") or "", "n": i.get("NomeComissao") or "",
+                                      "t": tipos.get(c, ""), "m": []})
+            item["m"].append([str(cod), x.get("DescricaoParticipacao") or "", (x.get("DataInicio") or "")[:10] or None, fim])
+    return out
 
 
 def senado_senadores() -> list[dict]:
@@ -386,21 +514,22 @@ def gerar(destino: Path, autores_portal: list[str] | None = None, hoje: date | N
     camara: dict[str, dict] = {}
     if novos_c:
         anos = sorted({int(m[:4]) for m in novos_c})
-        ev, pr, vt, vo, pp = [], [], [], [], []
+        ev, pr, vt, vo, pp, eo = [], [], [], [], [], []
         for a in anos:
             ev += camara_csv("eventos", a)
+            eo += camara_csv("eventosOrgaos", a)
             pr += camara_csv("eventosPresencaDeputados", a)
             vt += camara_csv("votacoes", a)
             vo += camara_csv("votacoesVotos", a)
             pp += camara_csv("votacoesProposicoes", a)
-        camara = {m: v for m, v in montar_camara(ev, pr, vt, vo, pp).items() if m in novos_c}
+        camara = {m: v for m, v in montar_camara(ev, pr, vt, vo, pp, eo).items() if m in novos_c}
         for m in novos_c:
-            camara.setdefault(m, {"sessoes": {}, "presenca": {}, "votacoes": [], "partidos": {}})
+            camara.setdefault(m, novo_mes())
         desde = max(INICIO, date.fromisoformat(min(novos_c) + "-01"))
         disc = camara_discursos([d["id"] for d in deputados], desde, hoje)
         for m, dias in disc.items():
             if m in camara or m in novos_c:
-                camara.setdefault(m, {"sessoes": {}, "presenca": {}, "votacoes": [], "partidos": {}})["discursos"] = dias
+                camara.setdefault(m, novo_mes())["discursos"] = dias
     # Senado
     senadores = senado_senadores()
     senado: dict[str, dict] = {}
@@ -414,7 +543,27 @@ def gerar(destino: Path, autores_portal: list[str] | None = None, hoje: date | N
             disc = senado_discursos(m)
         except (requests.RequestException, ValueError):
             disc = {}
-        senado[m] = {"sessoes": senado_sessoes(m), "presenca": presenca, "votacoes": votacoes, "partidos": partidos, "discursos": disc}
+        sessoes = senado_sessoes(m)
+        # Dias recentes ainda sem os discursos publicados: quem usou a palavra, com link para o vídeo da sessão.
+        recente = (hoje - timedelta(days=75)).isoformat()
+        for d, ss in sessoes.items():
+            if d in disc or d < recente:
+                continue
+            falas = []
+            for s in ss:
+                if s.get("c"):
+                    try:
+                        falas += [f for f in senado_oradores(s["c"]) if f["id"] not in {x["id"] for x in falas}]
+                    except (requests.RequestException, ValueError, KeyError):
+                        pass
+            if falas:
+                disc[d] = falas
+        try:
+            reunioes = senado_reunioes(m, hoje)
+        except (requests.RequestException, ValueError):
+            reunioes = {}
+        senado[m] = {"sessoes": sessoes, "presenca": presenca, "votacoes": votacoes, "partidos": partidos, "discursos": disc,
+                     "reunioes": reunioes, "presencaReuniao": {}}
 
     blocos = {}
     for casa, fn in (("camara", camara_blocos), ("senado", senado_blocos)):
@@ -457,7 +606,8 @@ def gerar(destino: Path, autores_portal: list[str] | None = None, hoje: date | N
                 for k, jan in janelas.get(m, {}).items():
                     membros[k] = [jan[0], jan[1], n["partidos"].get(k) or atual_partido.get(k, "")]
                 dados = {"versao": VERSAO, "casa": casa, "mes": m, "sessoes": n["sessoes"], "presenca": n["presenca"],
-                         "votacoes": n["votacoes"], "discursos": n.get("discursos", {}), "membros": membros}
+                         "votacoes": n["votacoes"], "discursos": n.get("discursos", {}), "membros": membros,
+                         "reunioes": n.get("reunioes", {}), "presencaReuniao": n.get("presencaReuniao", {})}
             else:
                 continue
             (pasta / f"{casa}-{m}.json").write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -477,6 +627,15 @@ def gerar(destino: Path, autores_portal: list[str] | None = None, hoje: date | N
     (pasta / "indice.json").write_text(json.dumps(indice, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (pasta / "membros.json").write_text(json.dumps({"versao": VERSAO, **cadastro}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (pasta / "blocos.json").write_text(json.dumps(blocos, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    comissoes = {}
+    for casa, fn in (("camara", camara_comissoes), ("senado", lambda: senado_comissoes(list(cadastro["senado"])))):
+        try:
+            comissoes[casa] = fn()
+        except (requests.RequestException, ValueError, KeyError) as e:
+            print(f"aviso: comissões {casa} indisponíveis ({type(e).__name__})")
+            comissoes[casa] = {}
+    (pasta / "comissoes.json").write_text(json.dumps({"versao": VERSAO, **comissoes}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"parlamento: comissões Câmara {len(comissoes['camara'])}, Senado {len(comissoes['senado'])}")
     ligados = sum(1 for c in cadastro.values() for x in c.values() if x["e"])
     print(f"parlamento: {len(todos)} meses; dias com sessão: Câmara {len(indice['dias']['camara'])}, Senado {len(indice['dias']['senado'])}; "
           f"{ligados} de {sum(len(c) for c in cadastro.values())} parlamentares ligados às emendas")

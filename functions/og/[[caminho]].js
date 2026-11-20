@@ -11,11 +11,21 @@ async function lerJson(env, request, caminho) {
   try { return await r.json(); } catch { return null; }
 }
 
+function versaoValida(v, agora = Date.now()) {
+  const m = /^(\d{2})(\d{2})(\d{4})$/.exec(v || "");
+  if (!m) return false;
+  const t = Date.UTC(+m[3], +m[2] - 1, +m[1]);
+  return Math.abs(agora - t) < 3 * 864e5;
+}
+
 export async function onRequest({ request, env, waitUntil }) {
   const m = new URL(request.url).pathname.match(CHAVE);
   if (!m) return new Response("Não encontrado", { status: 404 });
   const cache = typeof caches !== "undefined" ? caches.default : null;
-  const guardado = cache && (await cache.match(request.url));
+  // Chave do cache: só o caminho e um ?v= de data recente (ddmmaaaa, como o ETL gera). Qualquer outra
+  // query é ignorada, para que ?lixo-aleatório não force desenhar a mesma imagem de novo a cada pedido.
+  const u = new URL(request.url), chave = u.origin + u.pathname + (versaoValida(u.searchParams.get("v")) ? "?v=" + u.searchParams.get("v") : "");
+  const guardado = cache && (await cache.match(chave));
   if (guardado) return guardado;
 
   let dados;
@@ -31,6 +41,6 @@ export async function onRequest({ request, env, waitUntil }) {
   const resposta = new Response(await desenharCartao(dados), {
     headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" },
   });
-  if (cache) waitUntil(cache.put(request.url, resposta.clone()));
+  if (cache) waitUntil(cache.put(chave, resposta.clone()));
   return resposta;
 }

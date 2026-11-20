@@ -5,6 +5,7 @@ Tudo é HTML pronto, sem servidor: o Cloudflare Pages só entrega os arquivos.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -190,6 +191,9 @@ def barras_ano(por_ano: pd.Series) -> str:
     return f'<div class="barras">{itens}</div>'
 
 
+QRCODE_SHA256 = "18ae399f81182bc9de916e9c77b195df20cc58d6f2d55a62b085a299f1bf1780"
+
+
 def baixar_qrcode(destino: Path) -> None:
     """Gerador de QR code em JS (qrcode-generator, MIT) para as faturas Lightning do passe."""
     try:
@@ -197,7 +201,10 @@ def baixar_qrcode(destino: Path) -> None:
 
         r = requests.get("https://unpkg.com/qrcode-generator@1.4.4/qrcode.js", timeout=15)
         r.raise_for_status()
-        (destino / "qrcode.js").write_text(r.text, encoding="utf-8")
+        # O script roda na janela de pagamento: só publica se for exatamente o arquivo conhecido (npm 1.4.4).
+        if hashlib.sha256(r.content).hexdigest() != QRCODE_SHA256:
+            raise ValueError("qrcode.js com conteúdo inesperado")
+        (destino / "qrcode.js").write_bytes(r.content)
     except Exception as erro:  # sem QR, o passe mostra a fatura para copiar
         print(f"aviso: qrcode.js indisponível ({type(erro).__name__})")
 
@@ -439,7 +446,8 @@ def gerar_site(fav: pd.DataFrame, municipios: list[dict], destino: Path, fato: p
 {tabela(["Autor da emenda", "Valor"], [[e(a), brl(v)] for a, v in top_aut.items()], {1})}</section>
 <section><h2>Quem recebeu {glossario("favorecido", "Quem recebeu o dinheiro direto da União: prefeitura, fundo, entidade.", "../../")}</h2>
 {tabela(["Favorecido", "CNPJ/CPF", "Valor"], [[e(f), e(c), brl(v)] for (f, c), v in top_fav.items()], {2})}
-<p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a></p></section>
+<p class="dica"><a href="../../explorar/#l=favorecido&amp;f.municipio={quote(rotulo_m)}">Ver todos os favorecidos no Explorar ›</a>
+· <a href="../../ongs/#uf={uf}&amp;q={quote(nome)}">ONGs com sede em {e(nome)} ›</a></p></section>
 {secao_contratos(cnpj_prefeitura(top_fav_todos), contratos)}
 <script src="../../qrcode.js"></script><script src="../../passe.js"></script>
 <script>document.getElementById("pdf").onclick=()=>Passe.exigir(()=>{{document.querySelectorAll("#contratos details").forEach(d=>d.open=true);window.print();}});</script>
@@ -761,6 +769,7 @@ def gerar_api(destino: Path, fav: pd.DataFrame, municipios: list[dict], populaca
 - [Painel]({config.SITE_URL}/painel/)
 - [Acompanhamento parlamentar]({config.SITE_URL}/parlamento/): presença, votos nominais e discursos no Plenário da Câmara e do Senado
 - [Explorar]({config.SITE_URL}/explorar/)
+- [Transparência das ONGs]({config.SITE_URL}/ongs/): todas as OSCs do país, com emendas, convênios federais e CEPIM ligados pelo CNPJ; projetos de doadores estrangeiros (IATI) à parte, sem vínculo; ficha em {config.SITE_URL}/ongs/o/?c=<8 primeiros dígitos do CNPJ>
 - [Fontes, método e limites]({config.SITE_URL}/sobre/)
 - [Dados completos, como citar e passe de 24 h]({config.SITE_URL}/dados/)
 """, encoding="utf-8")
